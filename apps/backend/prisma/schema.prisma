@@ -1,0 +1,891 @@
+// SPTC Finance - Core Database Schema
+// Design rules (see project docs/ARCHITECTURE.md):
+//  - All money fields are Decimal(14,2) - never Float. Server is the only source of truth.
+//  - Financial rows are append-only where practical; corrections are new rows (Reversal/Adjustment),
+//    never destructive updates to historical Payment/Receipt/LedgerEntry rows.
+//  - Two separate identity domains: StaffUser (Business App) and Customer (Customer App).
+//  - Every entity that can be searched in the field (mobile, loanNumber, IMEI, serial, receiptNumber,
+//    paymentReference, dueDate, status, branchId) is indexed.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ORGANIZATION / IDENTITY / ACCESS CONTROL
+// ============================================================================
+
+model Branch {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff                 StaffUser[]
+  customers             Customer[]
+  products              Product[]
+  loans                 Loan[]
+  payments              Payment[]
+  collectionAssignments CollectionAssignment[]
+
+  @@index([isActive])
+}
+
+enum StaffRole {
+  OWNER
+  MANAGER
+  SHOPKEEPER
+  COLLECTION_AGENT
+  SUPPORT_AGENT
+}
+
+// Business App identity. Distinct from Customer identity so auth flows, session
+// lifetimes and RBAC never accidentally cross domains.
+model StaffUser {
+  id           String    @id @default(uuid())
+  branchId     String?
+  branch       Branch?   @relation(fields: [branchId], references: [id])
+  name         String
+  mobile       String    @unique
+  email        String?
+  passwordHash String
+  role         StaffRole
+  isActive     Boolean   @default(true)
+  isGlobal     Boolean   @default(false) // OWNER-level staff not restricted to a single branch
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastLoginAt  DateTime?
+
+  permissions               StaffPermission[]
+  sessions                  Session[]
+  devices                   Device[]
+  createdLoans              Loan[]                 @relation("LoanCreatedBy")
+  approvedLoans             Loan[]                 @relation("LoanApprovedBy")
+  collectedPayments         Payment[]              @relation("PaymentCollectedBy")
+  verifiedKyc               KYCRecord[]            @relation("KycVerifiedBy")
+  assignedCollections       CollectionAssignment[] @relation("CollectionAssignee")
+  madeCollectionAssignments CollectionAssignment[] @relation("CollectionAssignedBy")
+  assignedSupportTickets    SupportTicket[]
+  customerNotes             CustomerNote[]
+  initiatedReversals        Reversal[]             @relation("ReversalInitiatedBy")
+  approvedReversals         Reversal[]             @relation("ReversalApprovedBy")
+  adjustments               Adjustment[]           @relation("AdjustmentStaff")
+  approvedAdjustments       Adjustment[]           @relation("AdjustmentApprovedBy")
+
+  @@index([branchId])
+  @@index([role])
+  @@index([mobile])
+}
+
+// Fine-grained permission overrides layered on top of role defaults.
+// Role gives a sane default permission set (see rbac/permissions.ts); this table
+// lets Owner grant/revoke specific permissions per staff member without a new role.
+model StaffPermission {
+  id            String    @id @default(uuid())
+  staffUserId   String
+  staffUser     StaffUser @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+  permissionKey String
+  allowed       Boolean
+  grantedById   String?
+  createdAt     DateTime  @default(now())
+
+  @@unique([staffUserId, permissionKey])
+  @@index([staffUserId])
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  SUBMITTED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+// Customer App identity.
+model Customer {
+  id           String    @id @default(uuid())
+  branchId     String?
+  branch       Branch?   @relation(fields: [branchId], references: [id])
+  customerCode String    @unique // e.g. CUST-1023
+  mobile       String    @unique
+  name         String
+  email        String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  pincode      String?
+  kycStatus    KycStatus @default(NOT_STARTED)
+  pinHash      String?
+  passwordHash String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  kycRecords     KYCRecord[]
+  consents       Consent[]
+  devices        Device[]
+  sessions       Session[]
+  loans          Loan[]
+  payments       Payment[]
+  receipts       Receipt[]
+  notifications  Notification[]
+  supportTickets SupportTicket[]
+  notes          CustomerNote[]
+  ledgerEntries  LedgerEntry[]
+  otpAttempts    OtpAttempt[]
+
+  @@index([mobile])
+  @@index([customerCode])
+  @@index([branchId])
+  @@index([kycStatus])
+}
+
+model CustomerNote {
+  id         String    @id @default(uuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  staffId    String
+  staff      StaffUser @relation(fields: [staffId], references: [id])
+  note       String
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId])
+}
+
+enum KycDocumentType {
+  AADHAAR
+  PAN
+  VOTER_ID
+  DRIVING_LICENSE
+  PASSPORT
+  UTILITY_BILL
+  OTHER
+}
+
+model KYCRecord {
+  id                String          @id @default(uuid())
+  customerId        String
+  customer          Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  documentType      KycDocumentType
+  maskedIdentifier  String // e.g. "XXXX XXXX 1234" - never store/display full number in plain views
+  documentRef       String // pointer to encrypted-at-rest document storage, not the raw file
+  status            KycStatus       @default(SUBMITTED)
+  verifiedByStaffId String?
+  verifiedByStaff   StaffUser?      @relation("KycVerifiedBy", fields: [verifiedByStaffId], references: [id])
+  verifiedAt        DateTime?
+  rejectionReason   String?
+  expiresAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model Consent {
+  id          String    @id @default(uuid())
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  consentType String // e.g. TERMS_OF_SERVICE, PRIVACY_POLICY, LOAN_AGREEMENT, SMS_COMMUNICATION
+  version     String
+  ipAddress   String?
+  givenAt     DateTime  @default(now())
+  revokedAt   DateTime?
+
+  @@index([customerId])
+}
+
+// ============================================================================
+// AUTH INFRASTRUCTURE (shared shape, used by both identity domains)
+// ============================================================================
+
+enum SubjectType {
+  CUSTOMER
+  STAFF
+}
+
+model Device {
+  id               String      @id @default(uuid())
+  subjectType      SubjectType
+  customerId       String?
+  customer         Customer?   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  staffUserId      String?
+  staffUser        StaffUser?  @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+  deviceIdentifier String // client-generated stable device id
+  platform         String // ANDROID | IOS
+  appVersion       String?
+  pushToken        String?
+  isTrusted        Boolean     @default(false)
+  lastSeenAt       DateTime    @default(now())
+  createdAt        DateTime    @default(now())
+
+  sessions Session[]
+
+  @@unique([subjectType, customerId, staffUserId, deviceIdentifier])
+  @@index([customerId])
+  @@index([staffUserId])
+}
+
+model Session {
+  id               String      @id @default(uuid())
+  subjectType      SubjectType
+  customerId       String?
+  customer         Customer?   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  staffUserId      String?
+  staffUser        StaffUser?  @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+  deviceId         String?
+  device           Device?     @relation(fields: [deviceId], references: [id])
+  refreshTokenHash String
+  ipAddress        String?
+  userAgent        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  revokedReason    String?
+  createdAt        DateTime    @default(now())
+  lastUsedAt       DateTime    @default(now())
+
+  @@index([customerId])
+  @@index([staffUserId])
+  @@index([expiresAt])
+}
+
+enum OtpPurpose {
+  CUSTOMER_LOGIN
+  CUSTOMER_SIGNUP
+  STAFF_STEP_UP
+  PAYMENT_CONFIRM
+  DEVICE_VERIFY
+}
+
+// Every OTP request is logged for rate limiting / abuse detection. otpHash is a
+// salted hash - the raw OTP is never persisted.
+model OtpAttempt {
+  id         String     @id @default(uuid())
+  mobile     String
+  customerId String?
+  customer   Customer?  @relation(fields: [customerId], references: [id])
+  purpose    OtpPurpose
+  otpHash    String
+  expiresAt  DateTime
+  attempts   Int        @default(0)
+  verified   Boolean    @default(false)
+  verifiedAt DateTime?
+  ipAddress  String?
+  deviceId   String?
+  createdAt  DateTime   @default(now())
+
+  @@index([mobile, purpose])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// PRODUCT CATALOG / IMEI-SERIAL TRACKING
+// ============================================================================
+
+enum ProductIdentifierStatus {
+  INVENTORY
+  RESERVED
+  FINANCED
+  PAID_OFF
+  RETURNED
+  EXCHANGED
+  OTHER
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id])
+  brand          String
+  model          String
+  category       String
+  sku            String   @unique
+  purchasePrice  Decimal  @db.Decimal(14, 2)
+  sellingPrice   Decimal  @db.Decimal(14, 2)
+  financePrice   Decimal  @db.Decimal(14, 2)
+  warrantyMonths Int?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  identifiers ProductIdentifier[]
+  Loan        Loan[]
+
+  @@index([sku])
+  @@index([branchId])
+}
+
+// One row per physical tracked unit (a specific phone). Uniqueness constraints
+// on imei1/imei2/serialNumber prevent the same physical device being financed twice.
+model ProductIdentifier {
+  id           String                  @id @default(uuid())
+  productId    String
+  product      Product                 @relation(fields: [productId], references: [id])
+  imei1        String?                 @unique
+  imei2        String?                 @unique
+  serialNumber String?                 @unique
+  status       ProductIdentifierStatus @default(INVENTORY)
+  loanId       String?                 @unique
+  loan         Loan?                   @relation(fields: [loanId], references: [id])
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@index([productId])
+  @@index([status])
+  @@index([imei1])
+  @@index([imei2])
+  @@index([serialNumber])
+}
+
+// ============================================================================
+// LOAN PRODUCTS (configurable, versioned finance plans)
+// ============================================================================
+
+enum InstallmentFrequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+// LoanProduct is the named plan (e.g. "6-Month EMI Plan"). LoanProductVersion
+// freezes the actual rule set at a point in time. Loans reference a specific
+// version so that editing the LoanProduct later NEVER changes existing contracts.
+model LoanProduct {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  versions LoanProductVersion[]
+
+  @@index([isActive])
+}
+
+model LoanProductVersion {
+  id                   String               @id @default(uuid())
+  loanProductId        String
+  loanProduct          LoanProduct          @relation(fields: [loanProductId], references: [id])
+  versionNumber        Int
+  interestType         String // FLAT | REDUCING | ZERO_COST
+  interestRateAnnual   Decimal?             @db.Decimal(6, 3)
+  minInstallments      Int
+  maxInstallments      Int
+  installmentFrequency InstallmentFrequency @default(MONTHLY)
+  feeRules             Json // e.g. [{ "code": "PROCESSING_FEE", "amount": 199, "type": "FLAT" }]
+  latePaymentRules     Json // { "penaltyType": "FLAT"|"PERCENT", "amount": 100, "graceDays": 3 }
+  gracePeriodDays      Int                  @default(0)
+  partialPaymentRules  Json // { "allowed": true, "minAmount": 500 }
+  prepaymentRules      Json // { "allowed": true, "chargePercent": 0 }
+  earlyClosureRules    Json // { "allowed": true, "chargePercent": 2 }
+  settlementRules      Json // { "requiresApprovalRole": "OWNER" }
+  waiverRules          Json // { "requiresApprovalRole": "OWNER", "maxWaiverPercent": 10 }
+  reversalRules        Json // { "requiresApprovalRole": "MANAGER" }
+  isActive             Boolean              @default(true)
+  effectiveFrom        DateTime             @default(now())
+  createdAt            DateTime             @default(now())
+
+  loans Loan[]
+
+  @@unique([loanProductId, versionNumber])
+  @@index([loanProductId])
+}
+
+// ============================================================================
+// LOANS / EMI SCHEDULE
+// ============================================================================
+
+enum LoanStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  COMPLETED
+  DECLINED
+  CANCELLED
+  DEFAULTED
+  SETTLED
+}
+
+// Every financial term below is captured (not referenced) at origination time -
+// this is the "exact historical terms" requirement. loanProductVersionId is kept
+// for traceability but the numeric fields here are authoritative for this loan.
+model Loan {
+  id                   String             @id @default(uuid())
+  loanNumber           String             @unique // SPTC-LOAN-10234
+  customerId           String
+  customer             Customer           @relation(fields: [customerId], references: [id])
+  branchId             String
+  branch               Branch             @relation(fields: [branchId], references: [id])
+  productId            String?
+  product              Product?           @relation(fields: [productId], references: [id])
+  loanProductVersionId String
+  loanProductVersion   LoanProductVersion @relation(fields: [loanProductVersionId], references: [id])
+
+  cashPrice            Decimal              @db.Decimal(14, 2)
+  downPaymentAmount    Decimal              @db.Decimal(14, 2)
+  downPaymentPaid      Decimal              @default(0) @db.Decimal(14, 2)
+  pendingUdhaarAmount  Decimal              @default(0) @db.Decimal(14, 2)
+  financedPrincipal    Decimal              @db.Decimal(14, 2)
+  financeCharges       Decimal              @default(0) @db.Decimal(14, 2)
+  feesTotal            Decimal              @default(0) @db.Decimal(14, 2)
+  totalPayable         Decimal              @db.Decimal(14, 2)
+  installmentAmount    Decimal              @db.Decimal(14, 2)
+  numberOfInstallments Int
+  installmentFrequency InstallmentFrequency
+
+  startDate    DateTime
+  maturityDate DateTime
+  status       LoanStatus @default(DRAFT)
+
+  createdByStaffId  String
+  createdByStaff    StaffUser  @relation("LoanCreatedBy", fields: [createdByStaffId], references: [id])
+  approvedByStaffId String?
+  approvedByStaff   StaffUser? @relation("LoanApprovedBy", fields: [approvedByStaffId], references: [id])
+  approvalDecision  String? // APPROVED | DECLINED | MANUAL_REVIEW
+  approvalReason    String?
+  approvedAt        DateTime?
+  riskScoreSnapshot Json? // advisory score + reasons, captured at decision time
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productIdentifier     ProductIdentifier?
+  installments          Installment[]
+  payments              Payment[]
+  agreement             Agreement?
+  ledgerEntries         LedgerEntry[]
+  adjustments           Adjustment[]
+  collectionAssignments CollectionAssignment[]
+
+  @@index([customerId])
+  @@index([branchId])
+  @@index([status])
+  @@index([loanNumber])
+}
+
+enum InstallmentStatus {
+  UPCOMING
+  DUE
+  OVERDUE
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+  ADJUSTED
+}
+
+model Installment {
+  id              String            @id @default(uuid())
+  loanId          String
+  loan            Loan              @relation(fields: [loanId], references: [id])
+  sequence        Int
+  dueDate         DateTime
+  principalAmount Decimal           @db.Decimal(14, 2)
+  chargesAmount   Decimal           @default(0) @db.Decimal(14, 2)
+  totalAmount     Decimal           @db.Decimal(14, 2)
+  paidAmount      Decimal           @default(0) @db.Decimal(14, 2)
+  status          InstallmentStatus @default(UPCOMING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  allocations PaymentAllocation[]
+
+  @@unique([loanId, sequence])
+  @@index([loanId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+// ============================================================================
+// AGREEMENTS
+// ============================================================================
+
+model Agreement {
+  id                   String    @id @default(uuid())
+  loanId               String    @unique
+  loan                 Loan      @relation(fields: [loanId], references: [id])
+  version              Int       @default(1)
+  termsSnapshot        Json // full frozen copy of loan terms + EMI schedule at approval time
+  documentRef          String? // pointer to generated PDF
+  acceptedByCustomerAt DateTime?
+  acceptedIp           String?
+  createdAt            DateTime  @default(now())
+
+  @@index([loanId])
+}
+
+// ============================================================================
+// PAYMENTS / ALLOCATION / RECEIPTS / LEDGER
+// ============================================================================
+
+enum PaymentMethod {
+  CASH
+  UPI
+  BANK
+  GATEWAY
+  OTHER
+}
+
+enum PaymentStatus {
+  INITIATED
+  PENDING
+  SUCCESSFUL
+  FAILED
+  REVERSED
+  REFUNDED
+}
+
+enum PaymentSource {
+  CUSTOMER_ONLINE
+  STAFF_COLLECTED
+  OFFLINE_SYNCED
+}
+
+// idempotencyKey is the primary duplicate-prevention mechanism: the same
+// (idempotencyKey) can only ever produce one row. clientTransactionId is kept
+// for offline-sync traceability from the device's local queue.
+model Payment {
+  id                  String        @id @default(uuid())
+  paymentNumber       String        @unique
+  idempotencyKey      String        @unique
+  clientTransactionId String?       @unique
+  customerId          String
+  customer            Customer      @relation(fields: [customerId], references: [id])
+  loanId              String
+  loan                Loan          @relation(fields: [loanId], references: [id])
+  branchId            String?
+  branch              Branch?       @relation(fields: [branchId], references: [id])
+  amount              Decimal       @db.Decimal(14, 2)
+  method              PaymentMethod
+  status              PaymentStatus @default(INITIATED)
+  referenceId         String? // UPI/bank/gateway reference
+  gatewayPayload      Json?
+  source              PaymentSource
+  collectedByStaffId  String?
+  collectedByStaff    StaffUser?    @relation("PaymentCollectedBy", fields: [collectedByStaffId], references: [id])
+  createdAt           DateTime      @default(now())
+  confirmedAt         DateTime?
+
+  allocations PaymentAllocation[]
+  receipt     Receipt?
+  reversal    Reversal?
+
+  @@index([customerId])
+  @@index([loanId])
+  @@index([branchId])
+  @@index([status])
+  @@index([referenceId])
+  @@index([createdAt])
+}
+
+enum AllocationComponent {
+  DOWN_PAYMENT
+  EMI_PRINCIPAL
+  EMI_CHARGES
+  OVERDUE_PENALTY
+  FEE
+  OTHER
+}
+
+model PaymentAllocation {
+  id            String              @id @default(uuid())
+  paymentId     String
+  payment       Payment             @relation(fields: [paymentId], references: [id])
+  component     AllocationComponent
+  installmentId String?
+  installment   Installment?        @relation(fields: [installmentId], references: [id])
+  amount        Decimal             @db.Decimal(14, 2)
+  createdAt     DateTime            @default(now())
+
+  @@index([paymentId])
+  @@index([installmentId])
+}
+
+model Receipt {
+  id              String   @id @default(uuid())
+  receiptNumber   String   @unique
+  paymentId       String   @unique
+  payment         Payment  @relation(fields: [paymentId], references: [id])
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  loanId          String
+  amount          Decimal  @db.Decimal(14, 2)
+  previousBalance Decimal  @db.Decimal(14, 2)
+  newBalance      Decimal  @db.Decimal(14, 2)
+  collectorLabel  String // display label e.g. staff name / "Online Payment"
+  verificationId  String   @unique // used for tamper-evident lookups (QR/shareable link)
+  createdAt       DateTime @default(now())
+
+  @@index([customerId])
+  @@index([loanId])
+  @@index([receiptNumber])
+}
+
+// Reversal never deletes the original Payment. It creates a linked correction.
+model Reversal {
+  id                 String     @id @default(uuid())
+  originalPaymentId  String     @unique
+  originalPayment    Payment    @relation(fields: [originalPaymentId], references: [id])
+  reversalAmount     Decimal    @db.Decimal(14, 2)
+  reason             String
+  initiatedByStaffId String
+  initiatedByStaff   StaffUser  @relation("ReversalInitiatedBy", fields: [initiatedByStaffId], references: [id])
+  approvedByStaffId  String?
+  approvedByStaff    StaffUser? @relation("ReversalApprovedBy", fields: [approvedByStaffId], references: [id])
+  createdAt          DateTime   @default(now())
+
+  @@index([originalPaymentId])
+}
+
+enum AdjustmentType {
+  WAIVER
+  WRITE_OFF
+  MANUAL_CORRECTION
+}
+
+model Adjustment {
+  id                String         @id @default(uuid())
+  loanId            String
+  loan              Loan           @relation(fields: [loanId], references: [id])
+  type              AdjustmentType
+  amount            Decimal        @db.Decimal(14, 2)
+  reason            String
+  staffId           String
+  staff             StaffUser      @relation("AdjustmentStaff", fields: [staffId], references: [id])
+  approvedByStaffId String?
+  approvedByStaff   StaffUser?     @relation("AdjustmentApprovedBy", fields: [approvedByStaffId], references: [id])
+  createdAt         DateTime       @default(now())
+
+  @@index([loanId])
+}
+
+enum LedgerEntryType {
+  EMI_DUE
+  PAYMENT
+  REVERSAL
+  ADJUSTMENT
+  WAIVER
+  FEE
+}
+
+// Append-only per-customer/per-loan ledger. This is the authoritative
+// reconciliation source: sum of debits/credits must always match Loan balances.
+model LedgerEntry {
+  id            String          @id @default(uuid())
+  customerId    String
+  customer      Customer        @relation(fields: [customerId], references: [id])
+  loanId        String?
+  loan          Loan?           @relation(fields: [loanId], references: [id])
+  entryType     LedgerEntryType
+  debit         Decimal         @default(0) @db.Decimal(14, 2)
+  credit        Decimal         @default(0) @db.Decimal(14, 2)
+  balanceAfter  Decimal         @db.Decimal(14, 2)
+  referenceType String // e.g. "Payment", "Installment", "Reversal", "Adjustment"
+  referenceId   String
+  description   String
+  createdAt     DateTime        @default(now())
+
+  @@index([customerId])
+  @@index([loanId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+enum NotificationRecipientType {
+  CUSTOMER
+  STAFF
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+model Notification {
+  id               String                    @id @default(uuid())
+  recipientType    NotificationRecipientType
+  customerId       String?
+  customer         Customer?                 @relation(fields: [customerId], references: [id])
+  staffUserId      String?
+  event            String // e.g. EMI_DUE, PAYMENT_CONFIRMED - see notifications/events.ts
+  channel          NotificationChannel
+  templateKey      String
+  locale           String                    @default("en")
+  payload          Json
+  status           NotificationStatus        @default(PENDING)
+  deliveryMetadata Json?
+  retryCount       Int                       @default(0)
+  createdAt        DateTime                  @default(now())
+  sentAt           DateTime?
+
+  @@index([customerId])
+  @@index([staffUserId])
+  @@index([status])
+  @@index([event])
+}
+
+// ============================================================================
+// SUPPORT
+// ============================================================================
+
+enum SupportCategory {
+  PAYMENT
+  EMI
+  RECEIPT
+  LOAN
+  KYC
+  TECHNICAL_ISSUE
+  OTHER
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  ESCALATED
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id              String              @id @default(uuid())
+  ticketNumber    String              @unique
+  customerId      String
+  customer        Customer            @relation(fields: [customerId], references: [id])
+  category        SupportCategory
+  status          SupportTicketStatus @default(OPEN)
+  assignedStaffId String?
+  assignedStaff   StaffUser?          @relation(fields: [assignedStaffId], references: [id])
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  messages SupportMessage[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([assignedStaffId])
+}
+
+enum SupportSenderType {
+  CUSTOMER
+  STAFF
+  SYSTEM
+}
+
+model SupportMessage {
+  id         String            @id @default(uuid())
+  ticketId   String
+  ticket     SupportTicket     @relation(fields: [ticketId], references: [id])
+  senderType SupportSenderType
+  senderId   String?
+  message    String
+  createdAt  DateTime          @default(now())
+
+  attachments Attachment[]
+
+  @@index([ticketId])
+}
+
+model Attachment {
+  id               String          @id @default(uuid())
+  url              String
+  mimeType         String
+  sizeBytes        Int
+  uploadedByType   SubjectType
+  uploadedById     String?
+  supportMessageId String?
+  supportMessage   SupportMessage? @relation(fields: [supportMessageId], references: [id])
+  createdAt        DateTime        @default(now())
+
+  @@index([supportMessageId])
+}
+
+// ============================================================================
+// COLLECTIONS
+// ============================================================================
+
+enum CollectionAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  REASSIGNED
+}
+
+model CollectionAssignment {
+  id                     String                     @id @default(uuid())
+  loanId                 String
+  loan                   Loan                       @relation(fields: [loanId], references: [id])
+  branchId               String
+  branch                 Branch                     @relation(fields: [branchId], references: [id])
+  collectionAgentStaffId String
+  collectionAgentStaff   StaffUser                  @relation("CollectionAssignee", fields: [collectionAgentStaffId], references: [id])
+  assignedByStaffId      String
+  assignedByStaff        StaffUser                  @relation("CollectionAssignedBy", fields: [assignedByStaffId], references: [id])
+  status                 CollectionAssignmentStatus @default(ASSIGNED)
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  @@index([loanId])
+  @@index([collectionAgentStaffId])
+  @@index([branchId])
+}
+
+// ============================================================================
+// AUDIT
+// ============================================================================
+
+enum AuditActorType {
+  CUSTOMER
+  STAFF
+  SYSTEM
+}
+
+// Immutable-style: application code must never UPDATE or DELETE an AuditEvent row.
+// actorId is intentionally NOT a foreign key: the actor may be a StaffUser,
+// a Customer, or "SYSTEM", and this table must never lose history if the
+// referenced identity is later deleted.
+model AuditEvent {
+  id          String         @id @default(uuid())
+  actorType   AuditActorType
+  actorId     String?
+  role        String?
+  action      String // e.g. LOAN_APPROVED, PAYMENT_REVERSED, PERMISSION_CHANGED
+  entityType  String
+  entityId    String
+  beforeState Json?
+  afterState  Json?
+  reason      String?
+  ipAddress   String?
+  deviceId    String?
+  sessionId   String?
+  createdAt   DateTime       @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+}

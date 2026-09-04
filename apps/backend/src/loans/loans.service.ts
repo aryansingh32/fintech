@@ -1,0 +1,285 @@
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { AuditActorType, LedgerEntryType } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import { LedgerService } from '../ledger/ledger.service';
+import { CustomersService } from '../customers/customers.service';
+import { AuthUser } from '../common/interfaces/auth-user.interface';
+import { assertBranchAccess } from '../rbac/branch-scope.util';
+import { generateLoanNumber, retryOnConflict } from '../common/id-generators';
+import { calculateEmiSchedule, FeeRuleInput } from './emi-calculator';
+import { CreateLoanDto, ApproveLoanDto } from './dto/loan.dto';
+
+@Injectable()
+export class LoansService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly ledger: LedgerService,
+    private readonly customers: CustomersService,
+  ) {}
+
+  /**
+   * Loan creation wizard, steps 1-10 of blueprint #25: everything up to and
+   * including the full repayment summary happens here, server-side and
+   * deterministically. The loan is created in PENDING_APPROVAL - a human
+   * still has to explicitly approve it (see `decide` below) before it
+   * becomes active or any product identifier is marked financed.
+   */
+  async create(dto: CreateLoanDto, staff: AuthUser) {
+    const version = await this.prisma.loanProductVersion.findUnique({
+      where: { id: dto.loanProductVersionId },
+      include: { loanProduct: true },
+    });
+    if (!version || !version.isActive) throw new NotFoundException('Loan plan not found or inactive.');
+    if (dto.numberOfInstallments < version.minInstallments || dto.numberOfInstallments > version.maxInstallments) {
+      throw new BadRequestException(
+        `This plan allows between ${version.minInstallments} and ${version.maxInstallments} installments.`,
+      );
+    }
+
+    const customer = await this.customers.findById(dto.customerId, staff);
+    if (!staff.branchId && !staff.isGlobal) throw new ForbiddenException('Staff must belong to a branch.');
+    const branchId = staff.isGlobal ? customer.branchId ?? staff.branchId! : staff.branchId!;
+
+    let productIdentifier = null;
+    if (dto.productIdentifierId) {
+      productIdentifier = await this.prisma.productIdentifier.findUnique({
+        where: { id: dto.productIdentifierId },
+      });
+      if (!productIdentifier) throw new NotFoundException('Product identifier not found.');
+      if (productIdentifier.status !== 'INVENTORY') {
+        throw new BadRequestException(
+          `This unit cannot be financed (current status: ${productIdentifier.status}). Duplicate financing of the same device is not allowed.`,
+        );
+      }
+    }
+
+    const startDate = dto.startDate ? new Date(dto.startDate) : new Date();
+    const schedule = calculateEmiSchedule({
+      cashPrice: dto.cashPrice,
+      downPaymentAmount: dto.downPaymentAmount,
+      numberOfInstallments: dto.numberOfInstallments,
+      installmentFrequency: version.installmentFrequency,
+      interestType: version.interestType as 'FLAT' | 'REDUCING' | 'ZERO_COST',
+      interestRateAnnual: version.interestRateAnnual ?? undefined,
+      feeRules: (version.feeRules as unknown as FeeRuleInput[]) ?? [],
+      startDate,
+    });
+
+    const riskProfile = await this.customers.getRepaymentProfile(dto.customerId);
+
+    const loan = await this.prisma.$transaction(async (tx) => {
+      const created = await retryOnConflict(() =>
+        tx.loan.create({
+          data: {
+            loanNumber: generateLoanNumber(),
+            customerId: dto.customerId,
+            branchId,
+            productId: productIdentifier?.productId,
+            loanProductVersionId: version.id,
+            cashPrice: dto.cashPrice.toFixed(2),
+            downPaymentAmount: dto.downPaymentAmount.toFixed(2),
+            pendingUdhaarAmount: (dto.pendingUdhaarAmount ?? 0).toFixed(2),
+            financedPrincipal: schedule.financedPrincipal.toFixed(2),
+            financeCharges: schedule.financeCharges.toFixed(2),
+            feesTotal: schedule.feesTotal.toFixed(2),
+            totalPayable: schedule.totalPayable.toFixed(2),
+            installmentAmount: schedule.installmentAmount.toFixed(2),
+            numberOfInstallments: schedule.numberOfInstallments,
+            installmentFrequency: version.installmentFrequency,
+            startDate,
+            maturityDate: schedule.maturityDate,
+            status: 'PENDING_APPROVAL',
+            createdByStaffId: staff.id,
+            riskScoreSnapshot: riskProfile as never,
+          },
+        }),
+      );
+
+      await Promise.all(
+        schedule.installments.map((i) =>
+          tx.installment.create({
+            data: {
+              loanId: created.id,
+              sequence: i.sequence,
+              dueDate: i.dueDate,
+              principalAmount: i.principalAmount.toFixed(2),
+              chargesAmount: i.chargesAmount.toFixed(2),
+              totalAmount: i.totalAmount.toFixed(2),
+              status: 'UPCOMING',
+            },
+          }),
+        ),
+      );
+
+      if (productIdentifier) {
+        await tx.productIdentifier.update({
+          where: { id: productIdentifier.id },
+          data: { status: 'RESERVED', loanId: created.id },
+        });
+      }
+
+      await this.audit.record({
+        actorType: AuditActorType.STAFF,
+        actorId: staff.id,
+        role: staff.role,
+        action: 'LOAN_CREATED',
+        entityType: 'Loan',
+        entityId: created.id,
+        afterState: { status: 'PENDING_APPROVAL', totalPayable: schedule.totalPayable.toFixed(2) },
+      });
+
+      return created;
+    });
+
+    return this.findById(loan.id, staff);
+  }
+
+  async findById(loanId: string, staff: AuthUser) {
+    const loan = await this.prisma.loan.findUnique({
+      where: { id: loanId },
+      include: { installments: { orderBy: { sequence: 'asc' } }, productIdentifier: true, customer: true, agreement: true },
+    });
+    if (!loan) throw new NotFoundException('Loan not found.');
+    assertBranchAccess(staff, loan.branchId);
+    return loan;
+  }
+
+  async listForCustomer(customerId: string) {
+    return this.prisma.loan.findMany({
+      where: { customerId },
+      include: { installments: { orderBy: { sequence: 'asc' } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Human-controlled approval (blueprint #27). The advisory risk score was
+   * already frozen into riskScoreSnapshot at creation time; this endpoint
+   * only records the staff member's decision - it can never be skipped or
+   * automated, and a decline always requires a reason.
+   */
+  async decide(loanId: string, dto: ApproveLoanDto, staff: AuthUser) {
+    const loan = await this.findById(loanId, staff);
+    if (loan.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException(`This loan is not pending approval (current status: ${loan.status}).`);
+    }
+    if (dto.decision === 'DECLINED' && !dto.reason) {
+      throw new BadRequestException('A reason is required to decline a loan application.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.decision === 'APPROVED') {
+        await tx.loan.update({
+          where: { id: loanId },
+          data: {
+            status: 'ACTIVE',
+            approvalDecision: 'APPROVED',
+            approvalReason: dto.reason,
+            approvedByStaffId: staff.id,
+            approvedAt: new Date(),
+          },
+        });
+
+        if (loan.productIdentifier) {
+          await tx.productIdentifier.update({
+            where: { id: loan.productIdentifier.id },
+            data: { status: 'FINANCED' },
+          });
+        }
+
+        const agreement = await tx.agreement.create({
+          data: {
+            loanId,
+            termsSnapshot: {
+              loanNumber: loan.loanNumber,
+              cashPrice: loan.cashPrice.toString(),
+              downPaymentAmount: loan.downPaymentAmount.toString(),
+              financedPrincipal: loan.financedPrincipal.toString(),
+              financeCharges: loan.financeCharges.toString(),
+              feesTotal: loan.feesTotal.toString(),
+              totalPayable: loan.totalPayable.toString(),
+              installments: loan.installments.map((i) => ({
+                sequence: i.sequence,
+                dueDate: i.dueDate,
+                totalAmount: i.totalAmount.toString(),
+              })),
+            } as never,
+          },
+        });
+
+        await this.ledger.appendEntry(tx, {
+          customerId: loan.customerId,
+          loanId,
+          entryType: LedgerEntryType.EMI_DUE,
+          debit: loan.totalPayable,
+          balanceAfter: this.ledger.computeOutstanding(
+            { downPaymentAmount: loan.downPaymentAmount, downPaymentPaid: loan.downPaymentPaid, totalPayable: loan.totalPayable },
+            loan.installments,
+          ),
+          referenceType: 'Loan',
+          referenceId: loanId,
+          description: `Loan ${loan.loanNumber} activated`,
+        });
+
+        await this.audit.record({
+          actorType: AuditActorType.STAFF,
+          actorId: staff.id,
+          role: staff.role,
+          action: 'LOAN_APPROVED',
+          entityType: 'Loan',
+          entityId: loanId,
+          beforeState: { riskScoreSnapshot: loan.riskScoreSnapshot },
+          afterState: { status: 'ACTIVE', agreementId: agreement.id },
+          reason: dto.reason,
+        });
+      } else if (dto.decision === 'DECLINED') {
+        await tx.loan.update({
+          where: { id: loanId },
+          data: {
+            status: 'DECLINED',
+            approvalDecision: 'DECLINED',
+            approvalReason: dto.reason,
+            approvedByStaffId: staff.id,
+            approvedAt: new Date(),
+          },
+        });
+
+        if (loan.productIdentifier) {
+          await tx.productIdentifier.update({
+            where: { id: loan.productIdentifier.id },
+            data: { status: 'INVENTORY', loanId: null },
+          });
+        }
+
+        await this.audit.record({
+          actorType: AuditActorType.STAFF,
+          actorId: staff.id,
+          role: staff.role,
+          action: 'LOAN_DECLINED',
+          entityType: 'Loan',
+          entityId: loanId,
+          reason: dto.reason,
+        });
+      } else {
+        await tx.loan.update({
+          where: { id: loanId },
+          data: { approvalDecision: 'MANUAL_REVIEW', approvalReason: dto.reason },
+        });
+
+        await this.audit.record({
+          actorType: AuditActorType.STAFF,
+          actorId: staff.id,
+          role: staff.role,
+          action: 'LOAN_MANUAL_REVIEW',
+          entityType: 'Loan',
+          entityId: loanId,
+          reason: dto.reason,
+        });
+      }
+
+      return tx.loan.findUniqueOrThrow({ where: { id: loanId }, include: { installments: true, agreement: true } });
+    });
+  }
+}
