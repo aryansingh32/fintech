@@ -80,6 +80,32 @@ approval -> payment -> receipt -> reversal.
   was delivered or a payment gateway confirmed something that didn't
   happen.
 
+## Production deployment
+
+```bash
+cp .env.production.example .env.production   # fill in real secrets, never commit it
+docker build -t sptc-backend .
+docker run --env-file .env.production -p 3000:3000 sptc-backend
+```
+
+Before the container will even boot with `NODE_ENV=production`,
+`src/config/validate-production-env.ts` fails fast (clear error, non-zero
+exit) if `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` are missing, too short, or
+look like a placeholder, if `DATABASE_URL`/`CORS_ORIGINS` are unset, or if
+`SMS_PROVIDER`/`PAYMENT_GATEWAY_PROVIDER` name anything other than the one
+supported implementation (`twilio`/`razorpay`) - a misconfigured deploy
+should never silently come up in an unsafe state.
+
+Run `npx prisma migrate deploy` (with `DATABASE_URL` pointed at the
+production database) as an explicit step in your deploy pipeline before
+starting new containers - it is not run automatically on container boot, so
+multiple replicas starting at once can never race each other through a
+migration.
+
+The image runs as a non-root user and exposes `GET /v1/health` for
+container/load-balancer health checks (already wired as the image's
+`HEALTHCHECK`).
+
 ## Local dev database note
 
 `DATABASE_URL` may already be present in your shell environment (e.g. a

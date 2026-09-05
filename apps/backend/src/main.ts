@@ -5,8 +5,11 @@ import { ValidationPipe, VersioningType } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { validateProductionEnv } from './config/validate-production-env';
 
 async function bootstrap() {
+  validateProductionEnv(process.env);
+
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log'],
     // Needed to verify the Razorpay webhook signature against the exact
