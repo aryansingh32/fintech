@@ -31,6 +31,8 @@ import {
   retryOnConflict,
 } from '../common/id-generators';
 import { AllocationLineDto } from './dto/collect-payment.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEvent } from '../notifications/notification-events';
 
 export interface CollectPaymentInput {
   loanId: string;
@@ -60,6 +62,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -118,7 +121,8 @@ export class PaymentsService {
           async (tx) => this.postPaymentInTransaction(tx, input),
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         );
-        return { ...result, idempotentReplay: false };
+        await this.notifications.dispatchAll(result.notificationIds);
+        return { payment: result.payment, receipt: result.receipt, idempotentReplay: false };
       } catch (err) {
         const code = (err as { code?: string })?.code;
         // P2002: unique-constraint violation (idempotencyKey/paymentNumber).
@@ -135,7 +139,11 @@ export class PaymentsService {
   private async postPaymentInTransaction(
     tx: PrismaTx,
     input: CollectPaymentInput,
-  ): Promise<{ payment: Prisma.PaymentGetPayload<{ include: { allocations: true } }>; receipt: Prisma.ReceiptGetPayload<Record<string, never>> }> {
+  ): Promise<{
+    payment: Prisma.PaymentGetPayload<{ include: { allocations: true } }>;
+    receipt: Prisma.ReceiptGetPayload<Record<string, never>>;
+    notificationIds: string[];
+  }> {
     const { loan, state, installments } = await this.loadAllocationState(tx, input.loanId);
     this.assertAccess(loan, input.requestingUser);
 
@@ -275,7 +283,20 @@ export class PaymentsService {
       include: { allocations: true },
     });
 
-    return { payment: paymentWithAllocations, receipt };
+    const notificationIds = [
+      ...(await this.notifications.enqueue(tx, {
+        event: NotificationEvent.PAYMENT_CONFIRMED,
+        customerId: loan.customerId,
+        payload: { amount: amount.toFixed(2), loanNumber: loan.loanNumber },
+      })),
+      ...(await this.notifications.enqueue(tx, {
+        event: NotificationEvent.RECEIPT_GENERATED,
+        customerId: loan.customerId,
+        payload: { receiptNumber: receipt.receiptNumber, amount: amount.toFixed(2) },
+      })),
+    ];
+
+    return { payment: paymentWithAllocations, receipt, notificationIds };
   }
 
   private async loadAllocationState(

@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { CustomersService } from '../customers/customers.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEvent } from '../notifications/notification-events';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { assertBranchAccess } from '../rbac/branch-scope.util';
 import { generateLoanNumber, retryOnConflict } from '../common/id-generators';
@@ -17,6 +19,7 @@ export class LoansService {
     private readonly audit: AuditService,
     private readonly ledger: LedgerService,
     private readonly customers: CustomersService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -169,7 +172,9 @@ export class LoansService {
       throw new BadRequestException('A reason is required to decline a loan application.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const notificationIds: string[] = [];
+
+    const result = await this.prisma.$transaction(async (tx) => {
       if (dto.decision === 'APPROVED') {
         await tx.loan.update({
           where: { id: loanId },
@@ -234,6 +239,19 @@ export class LoansService {
           afterState: { status: 'ACTIVE', agreementId: agreement.id },
           reason: dto.reason,
         });
+
+        notificationIds.push(
+          ...(await this.notifications.enqueue(tx, {
+            event: NotificationEvent.LOAN_APPROVED,
+            customerId: loan.customerId,
+            payload: { loanNumber: loan.loanNumber },
+          })),
+          ...(await this.notifications.enqueue(tx, {
+            event: NotificationEvent.AGREEMENT_AVAILABLE,
+            customerId: loan.customerId,
+            payload: { loanNumber: loan.loanNumber },
+          })),
+        );
       } else if (dto.decision === 'DECLINED') {
         await tx.loan.update({
           where: { id: loanId },
@@ -262,6 +280,14 @@ export class LoansService {
           entityId: loanId,
           reason: dto.reason,
         });
+
+        notificationIds.push(
+          ...(await this.notifications.enqueue(tx, {
+            event: NotificationEvent.LOAN_REJECTED,
+            customerId: loan.customerId,
+            payload: { loanNumber: loan.loanNumber },
+          })),
+        );
       } else {
         await tx.loan.update({
           where: { id: loanId },
@@ -281,5 +307,8 @@ export class LoansService {
 
       return tx.loan.findUniqueOrThrow({ where: { id: loanId }, include: { installments: true, agreement: true } });
     });
+
+    await this.notifications.dispatchAll(notificationIds);
+    return result;
   }
 }

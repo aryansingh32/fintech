@@ -1,7 +1,9 @@
 import { AuditActorType, PaymentSource, PaymentStatus, SubjectType } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LedgerService } from '../ledger/ledger.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentsService } from './payments.service';
 import { ReversalService } from './reversal.service';
 import { calculateEmiSchedule } from '../loans/emi-calculator';
@@ -17,8 +19,9 @@ describe('PaymentsService (integration)', () => {
   const prisma = new PrismaService();
   const ledger = new LedgerService();
   const audit = new AuditService(prisma);
-  const payments = new PaymentsService(prisma, ledger, audit);
-  const reversals = new ReversalService(prisma, ledger, audit);
+  const notifications = new NotificationsService(prisma, new ConfigService());
+  const payments = new PaymentsService(prisma, ledger, audit, notifications);
+  const reversals = new ReversalService(prisma, ledger, audit, notifications);
 
   let branchId: string;
   let staffId: string;

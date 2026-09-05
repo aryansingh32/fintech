@@ -5,6 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { computeInstallmentStatus } from '../loans/installment-status';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEvent } from '../notifications/notification-events';
 
 export interface ReversePaymentInput {
   paymentId: string;
@@ -26,10 +28,13 @@ export class ReversalService {
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async reverse(input: ReversePaymentInput) {
-    return this.prisma.$transaction(async (tx) => {
+    const notificationIds: string[] = [];
+
+    const reversal = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
         where: { id: input.paymentId },
         include: { allocations: true, reversal: true },
@@ -117,7 +122,18 @@ export class ReversalService {
         sessionId: input.actor.sessionId,
       });
 
+      notificationIds.push(
+        ...(await this.notifications.enqueue(tx, {
+          event: NotificationEvent.PAYMENT_REVERSED,
+          customerId: loan.customerId,
+          payload: { amount: payment.amount.toFixed(2), loanNumber: loan.loanNumber, reason: input.reason },
+        })),
+      );
+
       return reversal;
     });
+
+    await this.notifications.dispatchAll(notificationIds);
+    return reversal;
   }
 }
