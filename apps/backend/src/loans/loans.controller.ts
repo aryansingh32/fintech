@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { SubjectType } from '@prisma/client';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { LoanStatus, SubjectType } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RequireSubject } from '../common/decorators/require-subject.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
@@ -21,6 +21,16 @@ export class LoansController {
   @Post()
   create(@Body() dto: CreateLoanDto, @CurrentUser() user: AuthUser) {
     return this.loans.create(dto, user);
+  }
+
+  @RequirePermissions(Permission.LOAN_VIEW)
+  @Get()
+  list(
+    @CurrentUser() user: AuthUser,
+    @Query('status') status?: LoanStatus,
+    @Query('customerId') customerId?: string,
+  ) {
+    return this.loans.list(user, { status, customerId });
   }
 
   @RequirePermissions(Permission.LOAN_VIEW)

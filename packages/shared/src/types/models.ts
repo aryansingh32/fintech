@@ -269,3 +269,12 @@ export interface DeviceSession {
   expiresAt: IsoDateString;
   device?: { platform: string; deviceIdentifier: string; lastSeenAt: IsoDateString } | null;
 }
+
+export interface OverdueAgingRow {
+  loanId: string;
+  loanNumber: string;
+  customerName: string;
+  dueDate: IsoDateString;
+  daysOverdue: number;
+  overdueAmount: Money;
+}

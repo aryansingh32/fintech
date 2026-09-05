@@ -1,6 +1,7 @@
 import { ApiError, ApiErrorBody, DeviceInfo, IssuedTokens } from '../types/api';
 import {
   AllocationComponent,
+  LoanStatus,
   PaymentMethod,
   SupportCategory,
   SupportTicketStatus,
@@ -13,6 +14,7 @@ import {
   Loan,
   LoanProduct,
   LoanProductVersion,
+  OverdueAgingRow,
   Payment,
   Product,
   ProductIdentifier,
@@ -265,6 +267,8 @@ export class ApiClient {
       numberOfInstallments: number;
       startDate?: string;
     }) => this.request<Loan>('POST', '/loans', dto),
+    list: (filters?: { status?: LoanStatus; customerId?: string }) =>
+      this.request<Loan[]>('GET', '/loans', undefined, { query: filters }),
     getById: (id: string) => this.request<Loan>('GET', `/loans/${id}`),
     decide: (id: string, decision: 'APPROVED' | 'DECLINED' | 'MANUAL_REVIEW', reason?: string) =>
       this.request<Loan>('POST', `/loans/${id}/decision`, { decision, reason }),
@@ -368,9 +372,12 @@ export class ApiClient {
         query,
       }),
     overdueAging: (query?: Record<string, string>) =>
-      this.request<Record<'1-7' | '8-30' | '31-60' | '60+', unknown[]>>('GET', '/reports/overdue-aging', undefined, {
-        query,
-      }),
+      this.request<Record<'1-7' | '8-30' | '31-60' | '60+', OverdueAgingRow[]>>(
+        'GET',
+        '/reports/overdue-aging',
+        undefined,
+        { query },
+      ),
     emiDue: (query?: Record<string, string>) => this.request<unknown[]>('GET', '/reports/emi-due', undefined, { query }),
     customerLedger: (customerId: string) =>
       this.request<unknown[]>('GET', `/reports/customer-ledger/${customerId}`),

@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditActorType, LedgerEntryType } from '@prisma/client';
+import { AuditActorType, LedgerEntryType, LoanStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LedgerService } from '../ledger/ledger.service';
@@ -7,7 +7,7 @@ import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationEvent } from '../notifications/notification-events';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
-import { assertBranchAccess } from '../rbac/branch-scope.util';
+import { assertBranchAccess, branchWhereClause } from '../rbac/branch-scope.util';
 import { generateLoanNumber, retryOnConflict } from '../common/id-generators';
 import { calculateEmiSchedule, FeeRuleInput } from './emi-calculator';
 import { CreateLoanDto, ApproveLoanDto } from './dto/loan.dto';
@@ -137,6 +137,23 @@ export class LoansService {
     });
 
     return this.findById(loan.id, staff);
+  }
+
+  /** Branch-scoped browse/filter for the Business App (dashboard queues, overdue navigation, search results). */
+  async list(
+    staff: AuthUser,
+    filters: { status?: LoanStatus; customerId?: string },
+  ) {
+    return this.prisma.loan.findMany({
+      where: {
+        ...branchWhereClause(staff),
+        status: filters.status,
+        customerId: filters.customerId,
+      },
+      include: { customer: true, installments: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
   }
 
   async findById(loanId: string, staff: AuthUser) {

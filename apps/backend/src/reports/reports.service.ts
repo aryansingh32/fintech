@@ -101,6 +101,7 @@ export class ReportsService {
     for (const installment of installments) {
       const daysOverdue = Math.floor((now.getTime() - installment.dueDate.getTime()) / 86_400_000);
       const row = {
+        loanId: installment.loan.id,
         loanNumber: installment.loan.loanNumber,
         customerName: installment.loan.customer.name,
         dueDate: installment.dueDate,
