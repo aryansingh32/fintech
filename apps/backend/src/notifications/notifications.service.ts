@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationChannel, NotificationRecipientType, NotificationStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrismaTx } from '../ledger/ledger.service';
+import { SmsProviderService } from './sms/sms-provider.service';
+import { PushProviderService } from './push/push-provider.service';
 import { NotificationEvent, renderTemplate, SupportedLocale } from './notification-events';
 
 export interface NotifyParams {
@@ -13,12 +15,6 @@ export interface NotifyParams {
   payload: Record<string, string | number>;
   locale?: SupportedLocale;
 }
-
-const CHANNEL_PROVIDER_ENV: Partial<Record<NotificationChannel, string>> = {
-  [NotificationChannel.SMS]: 'SMS_PROVIDER',
-  [NotificationChannel.EMAIL]: 'EMAIL_PROVIDER',
-  [NotificationChannel.PUSH]: 'PUSH_PROVIDER',
-};
 
 /**
  * Centralized, event-driven notification creation + dispatch (blueprint
@@ -36,6 +32,8 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly sms: SmsProviderService,
+    private readonly push: PushProviderService,
   ) {}
 
   async enqueue(tx: PrismaTx | PrismaService, params: NotifyParams): Promise<string[]> {
@@ -79,33 +77,95 @@ export class NotificationsService {
       notification.payload as Record<string, string | number>,
     );
 
-    if (notification.channel === NotificationChannel.IN_APP) {
-      // Stored row IS the delivery mechanism - the app fetches it directly.
-      await this.markStatus(notificationId, NotificationStatus.DELIVERED, { title, body });
+    switch (notification.channel) {
+      case NotificationChannel.IN_APP:
+        // Stored row IS the delivery mechanism - the app fetches it directly.
+        await this.markStatus(notificationId, NotificationStatus.DELIVERED, { title, body });
+        return;
+      case NotificationChannel.SMS:
+        await this.dispatchSms(notification.id, notification.customerId, notification.staffUserId, title, body);
+        return;
+      case NotificationChannel.PUSH:
+        await this.dispatchPush(notification.id, notification.customerId, notification.staffUserId, title, body, {
+          event: notification.event,
+        });
+        return;
+      case NotificationChannel.EMAIL:
+      default:
+        this.logger.warn(`EMAIL provider not configured - notification ${notificationId} not sent.`);
+        await this.markStatus(notificationId, NotificationStatus.FAILED, { title, body, reason: 'EMAIL_PROVIDER_NOT_CONFIGURED' });
+    }
+  }
+
+  private async dispatchSms(
+    notificationId: string,
+    customerId: string | null,
+    staffUserId: string | null,
+    title: string,
+    body: string,
+  ): Promise<void> {
+    if (!this.sms.isConfigured()) {
+      this.logger.warn(`SMS provider not configured - notification ${notificationId} not sent. Would have said: "${title}: ${body}"`);
+      await this.markStatus(notificationId, NotificationStatus.FAILED, { title, body, reason: 'SMS_PROVIDER_NOT_CONFIGURED' });
       return;
     }
 
-    const providerEnvVar = CHANNEL_PROVIDER_ENV[notification.channel];
-    const provider = providerEnvVar ? this.config.get<string>(providerEnvVar) : undefined;
+    const mobile = customerId
+      ? (await this.prisma.customer.findUnique({ where: { id: customerId } }))?.mobile
+      : (await this.prisma.staffUser.findUnique({ where: { id: staffUserId! } }))?.mobile;
+    if (!mobile) {
+      await this.markStatus(notificationId, NotificationStatus.FAILED, { title, body, reason: 'RECIPIENT_NOT_FOUND' });
+      return;
+    }
 
-    if (!provider) {
-      this.logger.warn(
-        `${notification.channel} provider not configured - notification ${notificationId} (${notification.event}) not sent. ` +
-          `Would have said: "${title}: ${body}"`,
-      );
-      await this.markStatus(notificationId, NotificationStatus.FAILED, {
+    try {
+      const result = await this.sms.send(mobile, body);
+      await this.markStatus(notificationId, NotificationStatus.SENT, { title, body, providerMessageId: result.providerMessageId });
+    } catch (err) {
+      this.logger.error(`SMS dispatch failed for notification ${notificationId}: ${(err as Error).message}`);
+      await this.markStatus(notificationId, NotificationStatus.FAILED, { title, body, reason: 'SEND_FAILED' });
+    }
+  }
+
+  private async dispatchPush(
+    notificationId: string,
+    customerId: string | null,
+    staffUserId: string | null,
+    title: string,
+    body: string,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    if (!this.push.isConfigured()) {
+      this.logger.warn(`PUSH provider not configured - notification ${notificationId} not sent. Would have said: "${title}: ${body}"`);
+      await this.markStatus(notificationId, NotificationStatus.FAILED, { title, body, reason: 'PUSH_PROVIDER_NOT_CONFIGURED' });
+      return;
+    }
+
+    const devices = await this.prisma.device.findMany({
+      where: { customerId: customerId ?? undefined, staffUserId: staffUserId ?? undefined, pushToken: { not: null } },
+    });
+    const tokens = devices.map((d) => d.pushToken).filter((t): t is string => Boolean(t));
+    if (tokens.length === 0) {
+      await this.markStatus(notificationId, NotificationStatus.FAILED, { title, body, reason: 'NO_DEVICE_TOKEN' });
+      return;
+    }
+
+    try {
+      const result = await this.push.send(tokens, title, body, data);
+      if (result.invalidTokens.length > 0) {
+        await this.prisma.device.updateMany({ where: { pushToken: { in: result.invalidTokens } }, data: { pushToken: null } });
+      }
+      const status = result.successCount > 0 ? NotificationStatus.SENT : NotificationStatus.FAILED;
+      await this.markStatus(notificationId, status, {
         title,
         body,
-        reason: `${notification.channel}_PROVIDER_NOT_CONFIGURED`,
+        successCount: result.successCount,
+        failureCount: result.failureCount,
       });
-      return;
+    } catch (err) {
+      this.logger.error(`Push dispatch failed for notification ${notificationId}: ${(err as Error).message}`);
+      await this.markStatus(notificationId, NotificationStatus.FAILED, { title, body, reason: 'SEND_FAILED' });
     }
-
-    // Real integration point. Never simulated - status only becomes
-    // SENT/DELIVERED once a real provider call (or its webhook) confirms it.
-    // await this.providerClientFor(notification.channel).send(...)
-    this.logger.log(`Dispatched ${notification.channel} notification ${notificationId} via ${provider}`);
-    await this.markStatus(notificationId, NotificationStatus.SENT, { title, body });
   }
 
   async listForCustomer(customerId: string) {

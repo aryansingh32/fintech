@@ -17,6 +17,7 @@ import {
   PaymentSource,
   PaymentStatus,
   Prisma,
+  SubjectType,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -41,6 +42,7 @@ import {
 import { AllocationLineDto } from './dto/collect-payment.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationEvent } from '../notifications/notification-events';
+import { RazorpayGatewayService } from './gateway/razorpay-gateway.service';
 
 export interface CollectPaymentInput {
   loanId: string;
@@ -72,6 +74,7 @@ export class PaymentsService {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly config: ConfigService,
+    private readonly gateway: RazorpayGatewayService,
   ) {}
 
   /**
@@ -88,29 +91,87 @@ export class PaymentsService {
   }
 
   /**
-   * Customer-initiated online payment (the "Pay EMI" button). No real
-   * payment gateway is configured in this codebase, and blueprint #63/#9
-   * are explicit: never fake a payment confirmation. So instead of pretending
-   * to start a checkout, this fails closed with a message the app can show
-   * as-is - the customer's account is never touched, and no PENDING payment
-   * row is created for a checkout that cannot actually happen.
+   * Customer-initiated online payment (the "Pay EMI" button) - step 1:
+   * open a checkout session. With no gateway configured this fails closed
+   * with a message the app can show as-is (blueprint #9/#63: never fake a
+   * checkout). Nothing is written to our own Payment table yet - Razorpay's
+   * order IS the pending record until `confirmCustomerPayment` (or the
+   * webhook) posts it as an authoritative payment.
    */
-  async initiateCustomerPayment(loanId: string, amount: number, requestingUser: AuthUser): Promise<never> {
+  async initiateCustomerPayment(loanId: string, amount: number, requestingUser: AuthUser) {
     const { loan } = await this.loadAllocationState(this.prisma, loanId);
     this.assertAccess(loan, requestingUser);
 
-    const gatewayProvider = this.config.get<string>('PAYMENT_GATEWAY_PROVIDER');
-    if (!gatewayProvider) {
+    if (!this.gateway.isConfigured()) {
       throw new ServiceUnavailableException(
         'Online payments are not available right now. Please pay at the store or contact support.',
       );
     }
 
-    // Real integration point for a configured gateway (Razorpay/PayU/etc.):
-    // create a PENDING Payment row, return the gateway's checkout session,
-    // and only mark it SUCCESSFUL from a verified webhook - never from the
-    // client's own claim that checkout completed (blueprint #9, #52).
-    throw new ServiceUnavailableException('Online payment gateway integration is not yet implemented.');
+    const order = await this.gateway.createOrder(amount, `loan_${loan.loanNumber}`, {
+      loanId: loan.id,
+      customerId: loan.customerId,
+    });
+    return order;
+  }
+
+  /**
+   * Step 2: the checkout SDK returns a payment id + a signature that only
+   * Razorpay could have produced (HMAC with a secret we never expose to the
+   * client). Verifying it is authoritative proof of payment - not a bare
+   * client claim - so once it checks out this posts through the exact same
+   * transactional, idempotent path as a staff-collected payment.
+   */
+  async confirmCustomerPayment(
+    params: { loanId: string; razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string; amount: number },
+    requestingUser: AuthUser,
+  ): Promise<CollectPaymentResult> {
+    const isValid = this.gateway.verifyPaymentSignature(
+      params.razorpayOrderId,
+      params.razorpayPaymentId,
+      params.razorpaySignature,
+    );
+    if (!isValid) {
+      throw new BadRequestException('Payment could not be verified. If money was deducted, it will be refunded automatically.');
+    }
+
+    return this.collectPayment({
+      loanId: params.loanId,
+      amount: params.amount,
+      method: PaymentMethod.GATEWAY,
+      referenceId: params.razorpayPaymentId,
+      idempotencyKey: `razorpay:${params.razorpayOrderId}`,
+      source: PaymentSource.CUSTOMER_ONLINE,
+      requestingUser,
+      actor: { actorType: AuditActorType.CUSTOMER, actorId: requestingUser.id },
+    });
+  }
+
+  /**
+   * Authoritative fallback for cases where the app never calls `confirm`
+   * (killed mid-checkout, connectivity dropped after payment succeeded).
+   * Idempotent by construction: the idempotencyKey is the same
+   * `razorpay:<orderId>` the confirm path uses, so whichever arrives first
+   * posts the payment and the other is a no-op replay.
+   */
+  async handleRazorpayWebhookPaymentCaptured(orderId: string, paymentId: string, amountPaise: number): Promise<void> {
+    const order = await this.gateway.getOrder(orderId);
+    const loanId = order.notes.loanId;
+    if (!loanId) return;
+
+    const loan = await this.prisma.loan.findUnique({ where: { id: loanId } });
+    if (!loan) return;
+
+    await this.collectPayment({
+      loanId,
+      amount: amountPaise / 100,
+      method: PaymentMethod.GATEWAY,
+      referenceId: paymentId,
+      idempotencyKey: `razorpay:${orderId}`,
+      source: PaymentSource.CUSTOMER_ONLINE,
+      requestingUser: { id: loan.customerId, subjectType: SubjectType.CUSTOMER, sessionId: 'webhook' },
+      actor: { actorType: AuditActorType.CUSTOMER, actorId: loan.customerId },
+    });
   }
 
   private assertAccess(loan: Prisma.LoanGetPayload<Record<string, never>>, requestingUser: AuthUser) {

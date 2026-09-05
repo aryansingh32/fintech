@@ -13,6 +13,7 @@ import { ProductsModule } from './products/products.module';
 import { LoansModule } from './loans/loans.module';
 import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { SmsModule } from './notifications/sms/sms.module';
 import { SupportModule } from './support/support.module';
 import { ReportsModule } from './reports/reports.module';
 import { SyncModule } from './sync/sync.module';
@@ -32,6 +33,7 @@ import { AccessGuard } from './common/guards/access.guard';
     AuthModule,
     RbacModule,
     LedgerModule,
+    SmsModule,
     NotificationsModule,
     CustomersModule,
     ProductsModule,

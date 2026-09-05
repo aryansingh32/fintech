@@ -69,3 +69,21 @@ export class InitiateCustomerPaymentDto {
   @IsPositive()
   amount: number;
 }
+
+export class ConfirmCustomerPaymentDto {
+  @IsUUID()
+  loanId: string;
+
+  @IsString()
+  razorpayOrderId: string;
+
+  @IsString()
+  razorpayPaymentId: string;
+
+  @IsString()
+  razorpaySignature: string;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
+  amount: number;
+}

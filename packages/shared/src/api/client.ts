@@ -11,6 +11,7 @@ import {
   AppNotification,
   Customer,
   DeviceSession,
+  GatewayOrder,
   Loan,
   LoanProduct,
   LoanProductVersion,
@@ -317,9 +318,22 @@ export class ApiClient {
       this.request<AllocationPreview>('GET', `/payments/loans/${loanId}/allocation-preview`, undefined, {
         query: { amount },
       }),
-    /** Customer-initiated online payment. Fails closed (throws ApiError) when no gateway is configured - see backend PaymentsService.initiateCustomerPayment. */
+    /** Opens a checkout session. Fails closed (throws ApiError) when no gateway is configured - see backend PaymentsService.initiateCustomerPayment. */
     customerInitiate: (loanId: string, amount: number) =>
-      this.request<never>('POST', '/payments/customer-initiate', { loanId, amount }),
+      this.request<GatewayOrder>('POST', '/payments/customer-initiate', { loanId, amount }),
+    /** Verifies the checkout SDK's signed callback and posts the payment through the same path a staff collection uses. */
+    customerConfirm: (dto: {
+      loanId: string;
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySignature: string;
+      amount: number;
+    }) =>
+      this.request<{ payment: Payment; receipt: Receipt; idempotentReplay: boolean }>(
+        'POST',
+        '/payments/customer-confirm',
+        dto,
+      ),
     collect: (dto: {
       loanId: string;
       amount: number;

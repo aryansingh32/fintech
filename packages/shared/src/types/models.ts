@@ -270,6 +270,13 @@ export interface DeviceSession {
   device?: { platform: string; deviceIdentifier: string; lastSeenAt: IsoDateString } | null;
 }
 
+export interface GatewayOrder {
+  orderId: string;
+  keyId: string;
+  amount: number; // paise
+  currency: string;
+}
+
 export interface OverdueAgingRow {
   loanId: string;
   loanNumber: string;

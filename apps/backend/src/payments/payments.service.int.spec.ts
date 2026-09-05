@@ -4,7 +4,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SmsProviderService } from '../notifications/sms/sms-provider.service';
+import { PushProviderService } from '../notifications/push/push-provider.service';
 import { PaymentsService } from './payments.service';
+import { RazorpayGatewayService } from './gateway/razorpay-gateway.service';
 import { ReversalService } from './reversal.service';
 import { calculateEmiSchedule } from '../loans/emi-calculator';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
@@ -19,8 +22,20 @@ describe('PaymentsService (integration)', () => {
   const prisma = new PrismaService();
   const ledger = new LedgerService();
   const audit = new AuditService(prisma);
-  const notifications = new NotificationsService(prisma, new ConfigService());
-  const payments = new PaymentsService(prisma, ledger, audit, notifications, new ConfigService());
+  const notifications = new NotificationsService(
+    prisma,
+    new ConfigService(),
+    new SmsProviderService(new ConfigService()),
+    new PushProviderService(new ConfigService()),
+  );
+  const payments = new PaymentsService(
+    prisma,
+    ledger,
+    audit,
+    notifications,
+    new ConfigService(),
+    new RazorpayGatewayService(new ConfigService()),
+  );
   const reversals = new ReversalService(prisma, ledger, audit, notifications);
 
   let branchId: string;

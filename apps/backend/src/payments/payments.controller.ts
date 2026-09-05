@@ -8,7 +8,7 @@ import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { Permission } from '../rbac/permissions';
 import { PaymentsService } from './payments.service';
 import { ReversalService } from './reversal.service';
-import { CollectPaymentDto, InitiateCustomerPaymentDto, ReversePaymentDto } from './dto/collect-payment.dto';
+import { CollectPaymentDto, ConfirmCustomerPaymentDto, InitiateCustomerPaymentDto, ReversePaymentDto } from './dto/collect-payment.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'payments', version: '1' })
@@ -32,6 +32,12 @@ export class PaymentsController {
   @Post('customer-initiate')
   initiateCustomerPayment(@Body() dto: InitiateCustomerPaymentDto, @CurrentUser() user: AuthUser) {
     return this.payments.initiateCustomerPayment(dto.loanId, dto.amount, user);
+  }
+
+  @RequireSubject(SubjectType.CUSTOMER)
+  @Post('customer-confirm')
+  confirmCustomerPayment(@Body() dto: ConfirmCustomerPaymentDto, @CurrentUser() user: AuthUser) {
+    return this.payments.confirmCustomerPayment(dto, user);
   }
 
   @RequireSubject(SubjectType.STAFF)

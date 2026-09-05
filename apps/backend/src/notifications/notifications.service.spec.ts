@@ -3,6 +3,8 @@ import { NotificationChannel, NotificationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
 import { NotificationEvent, renderTemplate } from './notification-events';
+import { SmsProviderService } from './sms/sms-provider.service';
+import { PushProviderService } from './push/push-provider.service';
 
 describe('renderTemplate', () => {
   it('fills placeholders for the requested locale', () => {
@@ -14,6 +16,24 @@ describe('renderTemplate', () => {
     expect(hi.body).not.toBe(en.body);
   });
 });
+
+/** Minimal stand-ins for the two provider services - real network calls are tested separately (see provider unit tests). */
+function fakeSms(configured: boolean, sendImpl?: () => Promise<{ providerMessageId: string }>): SmsProviderService {
+  return {
+    isConfigured: () => configured,
+    send: sendImpl ?? (async () => ({ providerMessageId: 'fake' })),
+  } as unknown as SmsProviderService;
+}
+
+function fakePush(
+  configured: boolean,
+  sendImpl?: () => Promise<{ successCount: number; failureCount: number; invalidTokens: string[] }>,
+): PushProviderService {
+  return {
+    isConfigured: () => configured,
+    send: sendImpl ?? (async () => ({ successCount: 1, failureCount: 0, invalidTokens: [] })),
+  } as unknown as PushProviderService;
+}
 
 /**
  * Uses the real test Postgres database (schema-validated Notification rows)
@@ -45,7 +65,7 @@ describe('NotificationsService (integration)', () => {
   });
 
   it('marks an IN_APP notification DELIVERED without any provider configured', async () => {
-    const notifications = new NotificationsService(prisma, new ConfigService({}));
+    const notifications = new NotificationsService(prisma, new ConfigService({}), fakeSms(false), fakePush(false));
     const ids = await notifications.enqueue(prisma, {
       event: NotificationEvent.PAYMENT_CONFIRMED,
       customerId,
@@ -58,8 +78,8 @@ describe('NotificationsService (integration)', () => {
     expect(row.status).toBe(NotificationStatus.DELIVERED);
   });
 
-  it('fails closed (never claims delivery) when a channel has no configured provider', async () => {
-    const notifications = new NotificationsService(prisma, new ConfigService({}));
+  it('fails closed (never claims delivery) when SMS has no configured provider', async () => {
+    const notifications = new NotificationsService(prisma, new ConfigService({}), fakeSms(false), fakePush(false));
     const ids = await notifications.enqueue(prisma, {
       event: NotificationEvent.EMI_DUE,
       customerId,
@@ -73,54 +93,101 @@ describe('NotificationsService (integration)', () => {
     expect((row.deliveryMetadata as { reason?: string })?.reason).toBe('SMS_PROVIDER_NOT_CONFIGURED');
   });
 
-  // ConfigService.get() checks process.env before its internal config object,
-  // so a "provider configured" scenario has to actually set process.env
-  // (matching how it's configured in every real deployment) rather than
-  // relying on the constructor's internalConfig, which would be shadowed by
-  // the ambient (empty) SMS_PROVIDER from .env.test.
-  describe('with SMS_PROVIDER set in the environment', () => {
-    const originalValue = process.env.SMS_PROVIDER;
-
-    beforeAll(() => {
-      process.env.SMS_PROVIDER = 'test-provider';
+  it('sends SMS when a provider IS configured (still never assumed - just recorded as sent)', async () => {
+    const notifications = new NotificationsService(prisma, new ConfigService({}), fakeSms(true), fakePush(false));
+    const ids = await notifications.enqueue(prisma, {
+      event: NotificationEvent.EMI_DUE,
+      customerId,
+      channels: [NotificationChannel.SMS],
+      payload: { amount: '100.00', loanNumber: 'SPTC-LOAN-X' },
     });
+    await notifications.dispatchAll(ids);
 
-    afterAll(() => {
-      process.env.SMS_PROVIDER = originalValue;
+    const row = await prisma.notification.findUniqueOrThrow({ where: { id: ids[0] } });
+    expect(row.status).toBe(NotificationStatus.SENT);
+  });
+
+  it('marks SMS FAILED (not thrown) when the provider call itself errors', async () => {
+    const notifications = new NotificationsService(
+      prisma,
+      new ConfigService({}),
+      fakeSms(true, async () => {
+        throw new Error('provider down');
+      }),
+      fakePush(false),
+    );
+    const ids = await notifications.enqueue(prisma, {
+      event: NotificationEvent.EMI_DUE,
+      customerId,
+      channels: [NotificationChannel.SMS],
+      payload: { amount: '100.00', loanNumber: 'SPTC-LOAN-X' },
     });
+    await notifications.dispatchAll(ids);
 
-    it('sends when a provider IS configured (still never assumed - just recorded as sent)', async () => {
-      const notifications = new NotificationsService(prisma, new ConfigService({}));
-      const ids = await notifications.enqueue(prisma, {
-        event: NotificationEvent.EMI_DUE,
+    const row = await prisma.notification.findUniqueOrThrow({ where: { id: ids[0] } });
+    expect(row.status).toBe(NotificationStatus.FAILED);
+    expect((row.deliveryMetadata as { reason?: string })?.reason).toBe('SEND_FAILED');
+  });
+
+  it('fails closed on PUSH with no registered device token, even if the provider is configured', async () => {
+    const notifications = new NotificationsService(prisma, new ConfigService({}), fakeSms(false), fakePush(true));
+    const ids = await notifications.enqueue(prisma, {
+      event: NotificationEvent.PAYMENT_CONFIRMED,
+      customerId,
+      channels: [NotificationChannel.PUSH],
+      payload: { amount: '100.00', loanNumber: 'SPTC-LOAN-X' },
+    });
+    await notifications.dispatchAll(ids);
+
+    const row = await prisma.notification.findUniqueOrThrow({ where: { id: ids[0] } });
+    expect(row.status).toBe(NotificationStatus.FAILED);
+    expect((row.deliveryMetadata as { reason?: string })?.reason).toBe('NO_DEVICE_TOKEN');
+  });
+
+  it('sends PUSH and prunes an invalid token reported by the provider', async () => {
+    const device = await prisma.device.create({
+      data: {
+        subjectType: 'CUSTOMER',
         customerId,
-        channels: [NotificationChannel.SMS],
-        payload: { amount: '100.00', loanNumber: 'SPTC-LOAN-X' },
-      });
-      await notifications.dispatchAll(ids);
-
-      const row = await prisma.notification.findUniqueOrThrow({ where: { id: ids[0] } });
-      expect(row.status).toBe(NotificationStatus.SENT);
+        deviceIdentifier: `device-${Date.now()}`,
+        platform: 'ANDROID',
+        pushToken: 'ExponentPushToken[stale]',
+      },
     });
 
-    it('retryFailed re-attempts a FAILED notification and increments retryCount', async () => {
-      process.env.SMS_PROVIDER = '';
-      const unconfigured = new NotificationsService(prisma, new ConfigService({}));
-      const ids = await unconfigured.enqueue(prisma, {
-        event: NotificationEvent.EMI_DUE,
-        customerId,
-        channels: [NotificationChannel.SMS],
-        payload: { amount: '50.00', loanNumber: 'SPTC-LOAN-RETRY' },
-      });
-      await unconfigured.dispatchAll(ids);
-
-      process.env.SMS_PROVIDER = 'test-provider';
-      const configuredNow = new NotificationsService(prisma, new ConfigService({}));
-      await configuredNow.retryFailed();
-
-      const row = await prisma.notification.findUniqueOrThrow({ where: { id: ids[0] } });
-      expect(row.status).toBe(NotificationStatus.SENT);
-      expect(row.retryCount).toBe(1);
+    const notifications = new NotificationsService(
+      prisma,
+      new ConfigService({}),
+      fakeSms(false),
+      fakePush(true, async () => ({ successCount: 0, failureCount: 1, invalidTokens: ['ExponentPushToken[stale]'] })),
+    );
+    const ids = await notifications.enqueue(prisma, {
+      event: NotificationEvent.PAYMENT_CONFIRMED,
+      customerId,
+      channels: [NotificationChannel.PUSH],
+      payload: { amount: '100.00', loanNumber: 'SPTC-LOAN-X' },
     });
+    await notifications.dispatchAll(ids);
+
+    const refreshedDevice = await prisma.device.findUniqueOrThrow({ where: { id: device.id } });
+    expect(refreshedDevice.pushToken).toBeNull();
+  });
+
+  it('retryFailed re-attempts a FAILED notification and increments retryCount', async () => {
+    const unconfigured = new NotificationsService(prisma, new ConfigService({}), fakeSms(false), fakePush(false));
+    const ids = await unconfigured.enqueue(prisma, {
+      event: NotificationEvent.EMI_DUE,
+      customerId,
+      channels: [NotificationChannel.SMS],
+      payload: { amount: '50.00', loanNumber: 'SPTC-LOAN-RETRY' },
+    });
+    await unconfigured.dispatchAll(ids);
+
+    const configuredNow = new NotificationsService(prisma, new ConfigService({}), fakeSms(true), fakePush(false));
+    await configuredNow.retryFailed();
+
+    const row = await prisma.notification.findUniqueOrThrow({ where: { id: ids[0] } });
+    expect(row.status).toBe(NotificationStatus.SENT);
+    expect(row.retryCount).toBe(1);
   });
 });

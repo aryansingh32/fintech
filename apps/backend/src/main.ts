@@ -9,6 +9,10 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log'],
+    // Needed to verify the Razorpay webhook signature against the exact
+    // bytes that were signed - JSON.stringify(parsedBody) would not
+    // reliably reproduce the original request body.
+    rawBody: true,
   });
 
   app.use(helmet());

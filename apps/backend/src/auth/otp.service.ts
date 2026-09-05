@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomInt, createHash } from 'crypto';
 import { OtpPurpose } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SmsProviderService } from '../notifications/sms/sms-provider.service';
 
 class TooManyRequestsException extends HttpException {
   constructor(message: string) {
@@ -38,6 +39,7 @@ export class OtpService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly sms: SmsProviderService,
   ) {}
 
   async requestOtp(
@@ -83,12 +85,11 @@ export class OtpService {
       },
     });
 
-    const smsProvider = this.config.get<string>('SMS_PROVIDER');
-    if (smsProvider) {
-      // Real integration point - never simulated. Delivery status must come
-      // from the provider's own confirmation/webhook, not assumed here.
-      // await this.smsProviderClient.send(mobile, otp);
-      this.logger.log(`OTP dispatched via ${smsProvider} for ${this.maskMobile(mobile)}`);
+    if (this.sms.isConfigured()) {
+      // Delivery status is whatever the provider's API call actually
+      // returns - a thrown error here means the OTP request itself fails,
+      // it is never swallowed into a false "sent" response.
+      await this.sms.send(mobile, `${otp} is your SPTC Finance verification code. Valid for ${Math.round(ttlSec / 60)} minutes.`);
       return { requestId: attempt.id, expiresAt };
     }
 
