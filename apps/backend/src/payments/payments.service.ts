@@ -1,4 +1,12 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Decimal from 'decimal.js';
 import {
   AllocationComponent,
@@ -63,6 +71,7 @@ export class PaymentsService {
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -76,6 +85,32 @@ export class PaymentsService {
     this.assertAccess(loan, requestingUser);
     const lines = computeSuggestedAllocation(amount, state);
     return { lines: lines.map(serializeLine) };
+  }
+
+  /**
+   * Customer-initiated online payment (the "Pay EMI" button). No real
+   * payment gateway is configured in this codebase, and blueprint #63/#9
+   * are explicit: never fake a payment confirmation. So instead of pretending
+   * to start a checkout, this fails closed with a message the app can show
+   * as-is - the customer's account is never touched, and no PENDING payment
+   * row is created for a checkout that cannot actually happen.
+   */
+  async initiateCustomerPayment(loanId: string, amount: number, requestingUser: AuthUser): Promise<never> {
+    const { loan } = await this.loadAllocationState(this.prisma, loanId);
+    this.assertAccess(loan, requestingUser);
+
+    const gatewayProvider = this.config.get<string>('PAYMENT_GATEWAY_PROVIDER');
+    if (!gatewayProvider) {
+      throw new ServiceUnavailableException(
+        'Online payments are not available right now. Please pay at the store or contact support.',
+      );
+    }
+
+    // Real integration point for a configured gateway (Razorpay/PayU/etc.):
+    // create a PENDING Payment row, return the gateway's checkout session,
+    // and only mark it SUCCESSFUL from a verified webhook - never from the
+    // client's own claim that checkout completed (blueprint #9, #52).
+    throw new ServiceUnavailableException('Online payment gateway integration is not yet implemented.');
   }
 
   private assertAccess(loan: Prisma.LoanGetPayload<Record<string, never>>, requestingUser: AuthUser) {

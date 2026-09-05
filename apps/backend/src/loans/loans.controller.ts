@@ -36,6 +36,24 @@ export class LoansController {
   }
 }
 
+/** Customer App's own loan list/detail - separate controller since the Business App's is staff-only at the class level. */
+@UseGuards(JwtAuthGuard)
+@RequireSubject(SubjectType.CUSTOMER)
+@Controller({ path: 'loans/me', version: '1' })
+export class CustomerLoansController {
+  constructor(private readonly loans: LoansService) {}
+
+  @Get()
+  list(@CurrentUser() user: AuthUser) {
+    return this.loans.listForCustomer(user.id);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.loans.findByIdForCustomer(id, user.id);
+  }
+}
+
 @Controller({ path: 'loan-products', version: '1' })
 @UseGuards(JwtAuthGuard)
 @RequireSubject(SubjectType.STAFF)

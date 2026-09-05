@@ -149,6 +149,16 @@ export class LoansService {
     return loan;
   }
 
+  async findByIdForCustomer(loanId: string, customerId: string) {
+    const loan = await this.prisma.loan.findUnique({
+      where: { id: loanId },
+      include: { installments: { orderBy: { sequence: 'asc' } }, productIdentifier: true, agreement: true },
+    });
+    if (!loan) throw new NotFoundException('Loan not found.');
+    if (loan.customerId !== customerId) throw new ForbiddenException('You do not have access to this loan.');
+    return loan;
+  }
+
   async listForCustomer(customerId: string) {
     return this.prisma.loan.findMany({
       where: { customerId },

@@ -20,7 +20,7 @@ describe('PaymentsService (integration)', () => {
   const ledger = new LedgerService();
   const audit = new AuditService(prisma);
   const notifications = new NotificationsService(prisma, new ConfigService());
-  const payments = new PaymentsService(prisma, ledger, audit, notifications);
+  const payments = new PaymentsService(prisma, ledger, audit, notifications, new ConfigService());
   const reversals = new ReversalService(prisma, ledger, audit, notifications);
 
   let branchId: string;

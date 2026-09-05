@@ -60,3 +60,12 @@ export class ReversePaymentDto {
   @IsString()
   reason: string;
 }
+
+export class InitiateCustomerPaymentDto {
+  @IsUUID()
+  loanId: string;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
+  amount: number;
+}

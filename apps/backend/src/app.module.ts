@@ -16,6 +16,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { SupportModule } from './support/support.module';
 import { ReportsModule } from './reports/reports.module';
 import { SyncModule } from './sync/sync.module';
+import { KycModule } from './kyc/kyc.module';
+import { ReceiptsModule } from './receipts/receipts.module';
 import { AppController } from './app.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AccessGuard } from './common/guards/access.guard';
@@ -38,6 +40,8 @@ import { AccessGuard } from './common/guards/access.guard';
     SupportModule,
     ReportsModule,
     SyncModule,
+    KycModule,
+    ReceiptsModule,
   ],
   controllers: [AppController],
   providers: [
