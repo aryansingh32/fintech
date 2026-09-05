@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
 import { CustomersService } from './customers.service';
-import { CustomersController } from './customers.controller';
+import { CustomersController, CustomerProfileController } from './customers.controller';
 
 @Module({
-  controllers: [CustomersController],
+  // CustomerProfileController ('customers/me') MUST be registered before
+  // CustomersController - otherwise CustomersController's 'customers/:id'
+  // route greedily matches '/customers/me' first.
+  controllers: [CustomerProfileController, CustomersController],
   providers: [CustomersService],
   exports: [CustomersService],
 })

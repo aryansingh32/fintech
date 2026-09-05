@@ -61,6 +61,12 @@ export class CustomersService {
     return customer;
   }
 
+  async getOwnProfile(customerId: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) throw new NotFoundException('Customer not found.');
+    return customer;
+  }
+
   async addNote(customerId: string, note: string, staff: AuthUser) {
     const customer = await this.findById(customerId, staff);
     const created = await this.prisma.customerNote.create({

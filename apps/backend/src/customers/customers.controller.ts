@@ -45,3 +45,16 @@ export class CustomersController {
     return this.customers.addNote(id, dto.note, user);
   }
 }
+
+/** Customer App's own profile - separate controller since CustomersController above is staff-only at the class level. */
+@UseGuards(JwtAuthGuard)
+@RequireSubject(SubjectType.CUSTOMER)
+@Controller({ path: 'customers/me', version: '1' })
+export class CustomerProfileController {
+  constructor(private readonly customers: CustomersService) {}
+
+  @Get()
+  me(@CurrentUser() user: AuthUser) {
+    return this.customers.getOwnProfile(user.id);
+  }
+}

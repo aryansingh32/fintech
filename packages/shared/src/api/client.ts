@@ -213,6 +213,13 @@ export class ApiClient {
   };
 
   // ---------------------------------------------------------------------
+  // My profile (Customer App)
+  // ---------------------------------------------------------------------
+  myProfile = {
+    get: () => this.request<Customer>('GET', '/customers/me'),
+  };
+
+  // ---------------------------------------------------------------------
   // Products / IMEI
   // ---------------------------------------------------------------------
   products = {
@@ -264,6 +271,41 @@ export class ApiClient {
   };
 
   // ---------------------------------------------------------------------
+  // Customer's own loans (Customer App)
+  // ---------------------------------------------------------------------
+  myLoans = {
+    list: () => this.request<Loan[]>('GET', '/loans/me'),
+    getById: (id: string) => this.request<Loan>('GET', `/loans/me/${id}`),
+  };
+
+  // ---------------------------------------------------------------------
+  // Receipts
+  // ---------------------------------------------------------------------
+  receipts = {
+    listMine: () => this.request<Receipt[]>('GET', '/receipts/me'),
+    listForLoan: (loanId: string) => this.request<Receipt[]>('GET', `/receipts/loan/${loanId}`),
+    getById: (id: string) => this.request<Receipt>('GET', `/receipts/${id}`),
+  };
+
+  // ---------------------------------------------------------------------
+  // KYC
+  // ---------------------------------------------------------------------
+  kyc = {
+    myRecords: () => this.request<import('../types/models').KYCRecord[]>('GET', '/kyc/me'),
+    listForCustomer: (customerId: string) =>
+      this.request<import('../types/models').KYCRecord[]>('GET', `/kyc/customers/${customerId}/records`),
+    submit: (
+      customerId: string,
+      dto: { documentType: string; maskedIdentifier: string; documentRef: string },
+    ) => this.request<import('../types/models').KYCRecord>('POST', `/kyc/customers/${customerId}/records`, dto),
+    verify: (recordId: string, decision: 'VERIFIED' | 'REJECTED', rejectionReason?: string) =>
+      this.request<import('../types/models').KYCRecord>('POST', `/kyc/records/${recordId}/verify`, {
+        decision,
+        rejectionReason,
+      }),
+  };
+
+  // ---------------------------------------------------------------------
   // Payments
   // ---------------------------------------------------------------------
   payments = {
@@ -271,6 +313,9 @@ export class ApiClient {
       this.request<AllocationPreview>('GET', `/payments/loans/${loanId}/allocation-preview`, undefined, {
         query: { amount },
       }),
+    /** Customer-initiated online payment. Fails closed (throws ApiError) when no gateway is configured - see backend PaymentsService.initiateCustomerPayment. */
+    customerInitiate: (loanId: string, amount: number) =>
+      this.request<never>('POST', '/payments/customer-initiate', { loanId, amount }),
     collect: (dto: {
       loanId: string;
       amount: number;
