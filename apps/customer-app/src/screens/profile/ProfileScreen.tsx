@@ -74,7 +74,7 @@ function MenuItem({ label, badge, onPress }: { label: string; badge?: string; on
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
+  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
   avatarCard: { alignItems: 'center', paddingVertical: spacing.xl },
   avatar: {
     width: 64,

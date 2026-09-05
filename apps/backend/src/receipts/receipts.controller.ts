@@ -2,9 +2,11 @@ import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { SubjectType } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RequireSubject } from '../common/decorators/require-subject.decorator';
+import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
+import { Permission } from '../rbac/permissions';
 import { ReceiptsService } from './receipts.service';
 
 @UseGuards(JwtAuthGuard)
@@ -21,6 +23,14 @@ export class ReceiptsController {
   @Get('loan/:loanId')
   forLoan(@Param('loanId') loanId: string, @CurrentUser() user: AuthUser) {
     return this.receipts.listForLoan(loanId, user);
+  }
+
+  /** Staff-side: a customer's full receipt history across all their loans. */
+  @RequireSubject(SubjectType.STAFF)
+  @RequirePermissions(Permission.PAYMENT_VIEW)
+  @Get('customer/:customerId')
+  forCustomer(@Param('customerId') customerId: string, @CurrentUser() user: AuthUser) {
+    return this.receipts.listForCustomer(customerId, user);
   }
 
   @Get(':id')

@@ -1,11 +1,15 @@
 import React from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, spacing, typography } from '@/theme/theme';
 import { Card, PrimaryButton, Screen } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
 import { roleLabel } from '@/rbac/uiPermissions';
+import { RootStackParamList } from '@/navigation/types';
 
 export function StaffProfileScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { identity, logout } = useAuth();
 
   const onLogout = () => {
@@ -26,6 +30,10 @@ export function StaffProfileScreen() {
       </Card>
 
       <View style={{ marginTop: spacing.xl }}>
+        <PrimaryButton label="Active Sessions" onPress={() => navigation.navigate('SecurityDevices')} variant="secondary" />
+      </View>
+
+      <View style={{ marginTop: spacing.md }}>
         <PrimaryButton label="Log Out" onPress={onLogout} variant="danger" />
       </View>
     </Screen>

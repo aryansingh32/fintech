@@ -16,12 +16,18 @@ export type RootStackParamList = {
   Main: undefined;
   GlobalSearch: undefined;
   CustomerProfile: { customerId: string };
+  EditCustomer: { customerId: string };
   CreateCustomer: undefined;
   CreateLoan: { customerId: string };
   LoanDetail: { loanId: string };
   CollectPayment: { loanId: string; suggestedAmount?: string };
+  CustomerReceipts: { customerId: string };
+  CustomerLedger: { customerId: string };
+  ReceiptDetail: { receiptId: string };
+  AuditLog: undefined;
   SupportList: undefined;
   SupportChat: { ticketId: string };
   LoanProductsAdmin: undefined;
   Profile: undefined;
+  SecurityDevices: undefined;
 };

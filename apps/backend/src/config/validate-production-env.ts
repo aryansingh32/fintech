@@ -39,6 +39,9 @@ export function validateProductionEnv(env: NodeJS.ProcessEnv): void {
       `Unsupported PAYMENT_GATEWAY_PROVIDER "${env.PAYMENT_GATEWAY_PROVIDER}" - only "razorpay" is implemented.`,
     );
   }
+  if (env.STORAGE_PROVIDER && env.STORAGE_PROVIDER !== 'r2') {
+    problems.push(`Unsupported STORAGE_PROVIDER "${env.STORAGE_PROVIDER}" - only "r2" is implemented.`);
+  }
 
   if (problems.length > 0) {
     throw new Error(

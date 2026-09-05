@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, typography } from '@/theme/theme';
-import { Screen, PrimaryButton } from '@/components/ui';
+import { Screen, Card, PrimaryButton, LiquidMark } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
 import { AuthStackParamList } from '@/navigation/types';
 import { ApiError } from '@sptc/shared';
@@ -33,11 +33,11 @@ export function MobileLoginScreen({ navigation }: Props) {
   return (
     <Screen style={styles.container}>
       <View style={styles.brandBlock}>
-        <Text style={styles.brand}>SPTC Finance</Text>
+        <LiquidMark size={64} />
         <Text style={styles.tagline}>Your EMIs, clear and simple.</Text>
       </View>
 
-      <View style={styles.form}>
+      <Card style={styles.form}>
         <Text style={styles.label}>Mobile number</Text>
         <TextInput
           value={mobile}
@@ -49,9 +49,9 @@ export function MobileLoginScreen({ navigation }: Props) {
           style={styles.input}
           autoFocus
         />
-        <View style={{ height: spacing.lg }} />
-        <PrimaryButton label="Send OTP" onPress={onSubmit} loading={loading} disabled={mobile.trim().length < 10} />
-      </View>
+      </Card>
+      <View style={{ height: spacing.lg }} />
+      <PrimaryButton label="Send OTP" icon="arrow-forward" onPress={onSubmit} loading={loading} disabled={mobile.trim().length < 10} />
 
       <Text style={styles.footnote}>
         By continuing, you agree to SPTC Finance's Terms of Service and Privacy Policy.
@@ -63,19 +63,13 @@ export function MobileLoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { justifyContent: 'space-between', padding: spacing.xl, paddingTop: spacing.xxl * 2 },
   brandBlock: { alignItems: 'center', marginBottom: spacing.xxl },
-  brand: { ...typography.display, color: colors.brand },
-  tagline: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  tagline: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md },
   form: { flexGrow: 0 },
   label: { ...typography.captionStrong, color: colors.textSecondary, marginBottom: spacing.sm },
   input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
     fontSize: 18,
+    fontFamily: 'Manrope_700Bold',
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
   },
   footnote: { ...typography.caption, color: colors.textSecondary, textAlign: 'center' },
 });

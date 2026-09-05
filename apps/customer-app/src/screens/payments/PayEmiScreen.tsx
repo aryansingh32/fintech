@@ -52,7 +52,7 @@ export function PayEmiScreen() {
         name: 'SPTC Finance',
         description: 'EMI Payment',
         prefill: { name: profile?.name, contact: profile?.mobile },
-        theme: { color: '#2C3FE0' },
+        theme: { color: colors.ink },
       });
 
       // Step 3: verify the SDK's signed callback and post the payment.

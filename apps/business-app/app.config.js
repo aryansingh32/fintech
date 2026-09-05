@@ -16,7 +16,10 @@ module.exports = {
     android: {
       package: 'com.sptcfinance.business',
       versionCode: 1,
-      permissions: [],
+      permissions: [
+        'RECEIVE_BOOT_COMPLETED',
+        'VIBRATE',
+      ],
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#0B1F3A',
@@ -28,5 +31,21 @@ module.exports = {
         projectId: 'REPLACE_WITH_EAS_PROJECT_ID',
       },
     },
+    plugins: [
+      [
+        'expo-notifications',
+        {
+          icon: './assets/icon.png',
+          color: '#0B1F3A',
+        },
+      ],
+      'expo-secure-store',
+      [
+        'expo-local-authentication',
+        {
+          faceIDPermission: 'Allow $(PRODUCT_NAME) to use Face ID for biometric authentication.',
+        },
+      ],
+    ],
   },
 };

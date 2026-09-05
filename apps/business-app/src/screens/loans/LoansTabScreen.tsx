@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   chipText: { ...typography.caption, color: colors.textPrimary },
   chipTextActive: { color: colors.textInverse },
-  content: { paddingBottom: spacing.xxl },
+  content: { paddingBottom: 120 },
   card: { marginBottom: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   loanNumber: { ...typography.bodyStrong, color: colors.textPrimary },

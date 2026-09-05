@@ -33,6 +33,35 @@ export class CreateLoanDto {
   startDate?: string; // ISO date; defaults to now
 }
 
+export class PreviewLoanDto {
+  @IsUUID()
+  loanProductVersionId: string;
+
+  @IsNumber()
+  @IsPositive()
+  cashPrice: number;
+
+  @IsNumber()
+  @Min(0)
+  downPaymentAmount: number;
+
+  @IsInt()
+  @Min(1)
+  numberOfInstallments: number;
+
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+}
+
+export class RescheduleInstallmentDto {
+  @IsString()
+  newDueDate: string; // ISO date
+
+  @IsString()
+  reason: string;
+}
+
 export class ApproveLoanDto {
   @IsIn(['APPROVED', 'DECLINED', 'MANUAL_REVIEW'])
   decision: 'APPROVED' | 'DECLINED' | 'MANUAL_REVIEW';

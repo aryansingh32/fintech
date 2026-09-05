@@ -1,11 +1,12 @@
-import React from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing, typography } from '@/theme/theme';
-import { Card, EmptyState, ErrorState, LoadingState, PrimaryButton } from '@/components/ui';
+import { BalanceCard, Card, EmptyState, ErrorState, IconTile, LoadingState, PrimaryButton } from '@/components/ui';
 import { useLoanList, useNotifications } from '@/hooks/useApi';
 import { formatDate, formatMoney, daysUntil } from '@/utils/format';
 import { summarizeLoan } from '@/utils/loanMath';
@@ -42,11 +43,14 @@ export function HomeDashboardScreen() {
           <Text style={styles.greeting}>{greeting},</Text>
           <Text style={styles.name}>Welcome back</Text>
         </View>
-        <PrimaryButton
-          label={unreadNotifications > 0 ? `🔔 ${unreadNotifications}` : '🔔'}
-          onPress={() => navigation.navigate('Notifications')}
-          variant="secondary"
-        />
+        <Pressable onPress={() => navigation.navigate('Notifications')}>
+          <IconTile icon="notifications" size={48} iconSize={22} />
+          {unreadNotifications > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadNotifications}</Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
 
       {!activeLoan ? (
@@ -59,13 +63,14 @@ export function HomeDashboardScreen() {
 
       <View style={styles.quickActions}>
         <QuickAction
+          icon="wallet"
           label="Pay EMI"
           onPress={() => activeLoan && navigation.navigate('PayEmi', { loanId: activeLoan.id, suggestedAmount: activeLoan.installmentAmount })}
           disabled={!activeLoan}
         />
-        <QuickAction label="View Loans" onPress={() => navigation.navigate('Loans')} />
-        <QuickAction label="Receipts" onPress={() => navigation.navigate('Payments')} />
-        <QuickAction label="Support" onPress={() => navigation.navigate('Support')} />
+        <QuickAction icon="document-text" label="View Loans" onPress={() => navigation.navigate('Loans')} />
+        <QuickAction icon="receipt" label="Receipts" onPress={() => navigation.navigate('Payments')} />
+        <QuickAction icon="chatbubble-ellipses" label="Support" onPress={() => navigation.navigate('Support')} />
       </View>
     </ScrollView>
   );
@@ -75,9 +80,15 @@ function ActiveLoanCard({ loan, onOpenLoan }: { loan: Loan; onOpenLoan: () => vo
   const summary = summarizeLoan(loan);
   const isOverdue = summary.overdueAmount > 0;
   const daysRemaining = summary.nextInstallment ? daysUntil(summary.nextInstallment.dueDate) : null;
+  const progressPct = Math.min(100, (summary.installmentsPaid / summary.installmentsTotal) * 100);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(progressAnim, { toValue: progressPct, duration: 700, useNativeDriver: false }).start();
+  }, [progressPct, progressAnim]);
 
   return (
-    <Card style={styles.loanCard}>
+    <BalanceCard style={styles.loanCard}>
       <Text style={styles.cardLabel}>ACTIVE LOAN</Text>
 
       <Text style={styles.cardLabel2}>Outstanding</Text>
@@ -85,7 +96,8 @@ function ActiveLoanCard({ loan, onOpenLoan }: { loan: Loan; onOpenLoan: () => vo
 
       {isOverdue ? (
         <View style={styles.overdueBanner}>
-          <Text style={styles.overdueText}>⚠ {formatMoney(summary.overdueAmount)} overdue - please pay soon</Text>
+          <Ionicons name="warning" size={14} color={colors.statusOverdue} />
+          <Text style={styles.overdueText}>{formatMoney(summary.overdueAmount)} overdue - please pay soon</Text>
         </View>
       ) : null}
 
@@ -114,26 +126,34 @@ function ActiveLoanCard({ loan, onOpenLoan }: { loan: Loan; onOpenLoan: () => vo
           EMIs: {summary.installmentsPaid} Paid / {summary.installmentsTotal} Total
         </Text>
         <View style={styles.progressTrack}>
-          <View
+          <Animated.View
             style={[
               styles.progressFill,
-              { width: `${Math.min(100, (summary.installmentsPaid / summary.installmentsTotal) * 100)}%` },
+              { width: progressAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) },
             ]}
           />
         </View>
       </View>
 
       <View style={{ marginTop: spacing.lg }}>
-        <PrimaryButton label="View Loan" onPress={onOpenLoan} variant="secondary" />
+        <PrimaryButton label="View Loan" onPress={onOpenLoan} variant="secondary" icon="arrow-forward" />
       </View>
-    </Card>
+    </BalanceCard>
   );
 }
 
-function QuickAction({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
+function QuickAction({ icon, label, onPress, disabled }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void; disabled?: boolean }) {
+  // Note: BlurView-backed Card must never sit inside an Animated transform (scale/translate) -
+  // on Android its blur snapshot desyncs from the view's actual position, producing a duplicated
+  // "ghost" box. Press feedback here is opacity-only, which is safe for blur content.
   return (
-    <View style={styles.quickActionItem}>
-      <PrimaryButton label={label} onPress={onPress} disabled={disabled} variant="secondary" />
+    <View style={[styles.quickActionItem, disabled && { opacity: 0.5 }]}>
+      <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+        <Card style={styles.quickActionCard}>
+          <IconTile icon={icon} size={40} iconSize={18} />
+          <Text style={styles.quickActionLabel}>{label}</Text>
+        </Card>
+      </Pressable>
     </View>
   );
 }
@@ -146,19 +166,35 @@ function getGreeting(): string {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  screen: { flex: 1, backgroundColor: 'transparent' },
+  content: { padding: spacing.lg, paddingBottom: 120 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   greeting: { ...typography.body, color: colors.textSecondary },
   name: { ...typography.h1, color: colors.textPrimary },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: colors.statusOverdue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { fontSize: 10, fontFamily: 'Manrope_800ExtraBold', color: colors.textInverse },
   loanCard: { marginTop: spacing.lg },
-  cardLabel: { ...typography.captionStrong, color: colors.brand, letterSpacing: 1 },
-  cardLabel2: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.md },
-  bigAmount: { ...typography.display, color: colors.textPrimary },
-  mediumAmount: { ...typography.h2, color: colors.textPrimary },
-  caption: { ...typography.caption, color: colors.textSecondary },
+  cardLabel: { ...typography.captionStrong, color: colors.accentStart, letterSpacing: 1 },
+  cardLabel2: { ...typography.caption, color: colors.textInverseSecondary, marginTop: spacing.md },
+  bigAmount: { ...typography.display, color: colors.textInverse },
+  mediumAmount: { ...typography.h2, color: colors.textInverse },
+  caption: { ...typography.caption, color: colors.textInverseSecondary },
   overdueBanner: {
-    backgroundColor: colors.statusOverdueSoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: 'rgba(224,51,63,0.18)',
     borderRadius: radius.sm,
     padding: spacing.md,
     marginTop: spacing.md,
@@ -167,8 +203,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', marginTop: spacing.lg, gap: spacing.xl },
   rowItem: { flex: 1 },
   progressRow: { marginTop: spacing.lg },
-  progressTrack: { height: 8, backgroundColor: colors.surfaceMuted, borderRadius: radius.pill, marginTop: spacing.xs, overflow: 'hidden' },
-  progressFill: { height: 8, backgroundColor: colors.statusPaid },
+  progressTrack: { height: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: radius.pill, marginTop: spacing.xs, overflow: 'hidden' },
+  progressFill: { height: 8, backgroundColor: colors.accentStart },
   quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.xl },
   quickActionItem: { width: '47%' },
+  quickActionCard: { alignItems: 'flex-start', gap: spacing.sm },
+  quickActionLabel: { ...typography.bodyStrong, color: colors.textPrimary },
 });

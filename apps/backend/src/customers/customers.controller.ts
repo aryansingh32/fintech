@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { SubjectType } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RequireSubject } from '../common/decorators/require-subject.decorator';
@@ -7,7 +7,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { Permission } from '../rbac/permissions';
 import { CustomersService } from './customers.service';
-import { AddCustomerNoteDto, CreateCustomerDto } from './dto/customer.dto';
+import { AddCustomerNoteDto, CreateCustomerDto, DeleteCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
 
 @UseGuards(JwtAuthGuard)
 @RequireSubject(SubjectType.STAFF)
@@ -37,6 +37,24 @@ export class CustomersController {
   @Get(':id/repayment-profile')
   repaymentProfile(@Param('id') id: string) {
     return this.customers.getRepaymentProfile(id);
+  }
+
+  @RequirePermissions(Permission.CUSTOMER_VIEW)
+  @Get(':id/summary')
+  summary(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.customers.getSummary(id, user);
+  }
+
+  @RequirePermissions(Permission.CUSTOMER_EDIT)
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateCustomerDto, @CurrentUser() user: AuthUser) {
+    return this.customers.update(id, dto, user);
+  }
+
+  @RequirePermissions(Permission.CUSTOMER_DELETE)
+  @Delete(':id')
+  remove(@Param('id') id: string, @Body() dto: DeleteCustomerDto, @CurrentUser() user: AuthUser) {
+    return this.customers.remove(id, dto, user);
   }
 
   @RequirePermissions(Permission.CUSTOMER_NOTE_ADD)

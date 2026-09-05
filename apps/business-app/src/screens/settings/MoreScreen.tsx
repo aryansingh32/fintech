@@ -26,6 +26,7 @@ export function MoreScreen() {
       ) : null}
 
       <MenuRow label="Support Tickets" onPress={() => navigation.navigate('SupportList')} />
+      <MenuRow label="Activity Log" onPress={() => navigation.navigate('AuditLog')} />
       {identity?.isGlobal ? <MenuRow label="Manage Loan Products" onPress={() => navigation.navigate('LoanProductsAdmin')} /> : null}
       <MenuRow label="Profile & Logout" onPress={() => navigation.navigate('Profile')} />
 
@@ -56,7 +57,7 @@ function MenuRow({ label, onPress }: { label: string; onPress: () => void }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, gap: spacing.md },
+  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 120 },
   identityCard: { marginBottom: spacing.md },
   role: { ...typography.h2, color: colors.textPrimary },
   caption: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },

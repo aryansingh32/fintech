@@ -10,7 +10,8 @@ import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { assertBranchAccess, branchWhereClause } from '../rbac/branch-scope.util';
 import { generateLoanNumber, retryOnConflict } from '../common/id-generators';
 import { calculateEmiSchedule, FeeRuleInput } from './emi-calculator';
-import { CreateLoanDto, ApproveLoanDto } from './dto/loan.dto';
+import { computeInstallmentStatus } from './installment-status';
+import { CreateLoanDto, ApproveLoanDto, PreviewLoanDto, RescheduleInstallmentDto } from './dto/loan.dto';
 
 @Injectable()
 export class LoansService {
@@ -29,6 +30,39 @@ export class LoansService {
    * still has to explicitly approve it (see `decide` below) before it
    * becomes active or any product identifier is marked financed.
    */
+  /**
+   * Same math `create` uses, minus everything that persists or requires a
+   * specific customer - lets the Business App show the shopkeeper the real
+   * principal/interest/total breakdown and full EMI schedule live, while
+   * they're still choosing a plan/amount/tenure, before anything is
+   * written. Never a source of truth by itself (the loan row + its
+   * installments, computed the same way at `create` time, are), but always
+   * computed by the identical `calculateEmiSchedule` function so it can
+   * never drift from what `create` will actually produce for the same
+   * inputs.
+   */
+  async previewSchedule(dto: PreviewLoanDto) {
+    const version = await this.prisma.loanProductVersion.findUnique({ where: { id: dto.loanProductVersionId } });
+    if (!version || !version.isActive) throw new NotFoundException('Loan plan not found or inactive.');
+    if (dto.numberOfInstallments < version.minInstallments || dto.numberOfInstallments > version.maxInstallments) {
+      throw new BadRequestException(
+        `This plan allows between ${version.minInstallments} and ${version.maxInstallments} installments.`,
+      );
+    }
+
+    const startDate = dto.startDate ? new Date(dto.startDate) : new Date();
+    return calculateEmiSchedule({
+      cashPrice: dto.cashPrice,
+      downPaymentAmount: dto.downPaymentAmount,
+      numberOfInstallments: dto.numberOfInstallments,
+      installmentFrequency: version.installmentFrequency,
+      interestType: version.interestType as 'FLAT' | 'REDUCING' | 'ZERO_COST',
+      interestRateAnnual: version.interestRateAnnual ?? undefined,
+      feeRules: (version.feeRules as unknown as FeeRuleInput[]) ?? [],
+      startDate,
+    });
+  }
+
   async create(dto: CreateLoanDto, staff: AuthUser) {
     const version = await this.prisma.loanProductVersion.findUnique({
       where: { id: dto.loanProductVersionId },
@@ -337,5 +371,54 @@ export class LoansService {
 
     await this.notifications.dispatchAll(notificationIds);
     return result;
+  }
+
+  async rescheduleInstallment(loanId: string, installmentId: string, dto: RescheduleInstallmentDto, staff: AuthUser) {
+    const loan = await this.findById(loanId, staff);
+    const installment = loan.installments.find((i) => i.id === installmentId);
+    if (!installment) throw new NotFoundException('Installment not found on this loan.');
+    if (installment.status === 'PAID' || installment.status === 'CANCELLED') {
+      throw new BadRequestException(`Cannot reschedule an installment that is already ${installment.status.toLowerCase()}.`);
+    }
+
+    const newDueDate = new Date(dto.newDueDate);
+    if (Number.isNaN(newDueDate.getTime())) {
+      throw new BadRequestException('newDueDate is not a valid date.');
+    }
+    const previousDueDate = installment.dueDate;
+    const newStatus = computeInstallmentStatus(installment.totalAmount, installment.paidAmount, newDueDate);
+
+    const notificationIds: string[] = [];
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.installment.update({
+        where: { id: installmentId },
+        data: { dueDate: newDueDate, status: newStatus },
+      });
+
+      await this.audit.record({
+        actorType: AuditActorType.STAFF,
+        actorId: staff.id,
+        role: staff.role,
+        action: 'LOAN_INSTALLMENT_RESCHEDULED',
+        entityType: 'Installment',
+        entityId: installmentId,
+        beforeState: { dueDate: previousDueDate },
+        afterState: { dueDate: newDueDate },
+        reason: dto.reason,
+      });
+
+      notificationIds.push(
+        ...(await this.notifications.enqueue(tx, {
+          event: NotificationEvent.EMI_RESCHEDULED,
+          customerId: loan.customerId,
+          payload: { loanNumber: loan.loanNumber, dueDate: newDueDate.toISOString().slice(0, 10) },
+        })),
+      );
+
+      return result;
+    });
+
+    await this.notifications.dispatchAll(notificationIds);
+    return updated;
   }
 }

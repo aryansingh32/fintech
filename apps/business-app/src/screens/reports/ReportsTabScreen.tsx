@@ -71,7 +71,7 @@ export function ReportsTabScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg },
+  content: { padding: spacing.lg, paddingBottom: 120 },
   title: { ...typography.h1, color: colors.textPrimary, marginBottom: spacing.lg },
   sectionTitle: { ...typography.bodyStrong, color: colors.textPrimary, marginBottom: spacing.sm },
   bigAmount: { ...typography.display, color: colors.textPrimary },

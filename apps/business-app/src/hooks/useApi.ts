@@ -3,6 +3,24 @@ import { apiClient } from '@/api/apiClient';
 import { LoanStatus, SupportTicketStatus } from '@sptc/shared';
 
 // ---------------------------------------------------------------------
+// Sessions / devices
+// ---------------------------------------------------------------------
+export function useStaffDevices() {
+  return useQuery({
+    queryKey: ['auth', 'devices'],
+    queryFn: () => apiClient.staffAuth.listDevices(),
+  });
+}
+
+export function useLogoutOtherDevices() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.staffAuth.logoutOtherDevices(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['auth', 'devices'] }),
+  });
+}
+
+// ---------------------------------------------------------------------
 // Customers
 // ---------------------------------------------------------------------
 /** Empty query returns the branch's most recently created customers (see backend CustomersService.search). */
@@ -18,6 +36,7 @@ export function useCustomer(id: string | undefined) {
     queryKey: ['customers', 'detail', id],
     queryFn: () => apiClient.customers.getById(id!),
     enabled: Boolean(id),
+    refetchInterval: 20_000,
   });
 }
 
@@ -42,6 +61,88 @@ export function useCreateCustomer() {
   return useMutation({
     mutationFn: apiClient.customers.create,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customers'] }),
+  });
+}
+
+export function useUpdateCustomer(customerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: Parameters<typeof apiClient.customers.update>[1]) => apiClient.customers.update(customerId, dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customers', 'detail', customerId] });
+    },
+  });
+}
+
+export function useDeleteCustomer(customerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ currentPassword, reason }: { currentPassword: string; reason?: string }) =>
+      apiClient.customers.delete(customerId, currentPassword, reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customers'] }),
+  });
+}
+
+export function useCustomerKyc(customerId: string) {
+  return useQuery({
+    queryKey: ['kyc', customerId],
+    queryFn: () => apiClient.kyc.listForCustomer(customerId),
+  });
+}
+
+export function useSubmitKyc(customerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: { documentType: string; maskedIdentifier: string; documentRef: string }) =>
+      apiClient.kyc.submit(customerId, dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kyc', customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers', 'detail', customerId] });
+    },
+  });
+}
+
+export function useVerifyKyc(customerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recordId, decision, rejectionReason }: { recordId: string; decision: 'VERIFIED' | 'REJECTED'; rejectionReason?: string }) =>
+      apiClient.kyc.verify(recordId, decision, rejectionReason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kyc', customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers', 'detail', customerId] });
+    },
+  });
+}
+
+export function useCustomerSummary(customerId: string | undefined) {
+  return useQuery({
+    queryKey: ['customers', 'summary', customerId],
+    queryFn: () => apiClient.customers.summary(customerId!),
+    enabled: Boolean(customerId),
+    refetchInterval: 20_000,
+  });
+}
+
+/** Presigns an R2 upload then PUTs the file directly to storage, returning the public URL to save on the record. */
+export function useUploadFile() {
+  return useMutation({
+    mutationFn: async ({
+      uri,
+      contentType,
+      purpose,
+    }: {
+      uri: string;
+      contentType: string;
+      purpose: 'customer-photo' | 'reference-photo' | 'kyc-document';
+    }) => {
+      const { uploadUrl, publicUrl } = await apiClient.uploads.presign(purpose, contentType);
+      const file = await fetch(uri);
+      const blob = await file.blob();
+      const putResponse = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
+      if (!putResponse.ok) throw new Error('Upload failed. Please try again.');
+      return publicUrl;
+    },
   });
 }
 
@@ -99,6 +200,35 @@ export function useLoan(id: string | undefined) {
     queryKey: ['loans', 'detail', id],
     queryFn: () => apiClient.loans.getById(id!),
     enabled: Boolean(id),
+    refetchInterval: 20_000,
+  });
+}
+
+export function useRescheduleInstallment(loanId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ installmentId, newDueDate, reason }: { installmentId: string; newDueDate: string; reason: string }) =>
+      apiClient.loans.rescheduleInstallment(loanId, installmentId, newDueDate, reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loans', 'detail', loanId] }),
+  });
+}
+
+export function useLoanPreview(dto: {
+  loanProductVersionId?: string;
+  cashPrice: number;
+  downPaymentAmount: number;
+  numberOfInstallments: number;
+}) {
+  return useQuery({
+    queryKey: ['loans', 'preview', dto],
+    queryFn: () =>
+      apiClient.loans.preview({
+        loanProductVersionId: dto.loanProductVersionId!,
+        cashPrice: dto.cashPrice,
+        downPaymentAmount: dto.downPaymentAmount,
+        numberOfInstallments: dto.numberOfInstallments,
+      }),
+    enabled: Boolean(dto.loanProductVersionId) && dto.cashPrice > 0 && dto.numberOfInstallments > 0,
   });
 }
 
@@ -137,10 +267,31 @@ export function useCollectPayment() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: apiClient.payments.collect,
-    onSuccess: (_data, vars) => {
+    onSuccess: (data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['loans', 'detail', vars.loanId] });
       queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['customers', 'summary', data.payment.customerId] });
     },
+  });
+}
+
+// ---------------------------------------------------------------------
+// Receipts
+// ---------------------------------------------------------------------
+export function useReceipt(id: string | undefined) {
+  return useQuery({
+    queryKey: ['receipts', 'detail', id],
+    queryFn: () => apiClient.receipts.getById(id!),
+    enabled: Boolean(id),
+  });
+}
+
+export function useCustomerReceipts(customerId: string | undefined) {
+  return useQuery({
+    queryKey: ['receipts', 'byCustomer', customerId],
+    queryFn: () => apiClient.receipts.listForCustomer(customerId!),
+    enabled: Boolean(customerId),
   });
 }
 
@@ -197,15 +348,19 @@ export function useUpdateTicketStatus(ticketId: string) {
 // Reports
 // ---------------------------------------------------------------------
 export function useDailyCollection(query?: Record<string, string>) {
-  return useQuery({ queryKey: ['reports', 'daily-collection', query], queryFn: () => apiClient.reports.dailyCollection(query) });
+  return useQuery({
+    queryKey: ['reports', 'daily-collection', query],
+    queryFn: () => apiClient.reports.dailyCollection(query),
+    refetchInterval: 30_000,
+  });
 }
 
 export function useLoanPortfolio() {
-  return useQuery({ queryKey: ['reports', 'loan-portfolio'], queryFn: () => apiClient.reports.loanPortfolio() });
+  return useQuery({ queryKey: ['reports', 'loan-portfolio'], queryFn: () => apiClient.reports.loanPortfolio(), refetchInterval: 30_000 });
 }
 
 export function useOverdueAging() {
-  return useQuery({ queryKey: ['reports', 'overdue-aging'], queryFn: () => apiClient.reports.overdueAging() });
+  return useQuery({ queryKey: ['reports', 'overdue-aging'], queryFn: () => apiClient.reports.overdueAging(), refetchInterval: 30_000 });
 }
 
 export function useEmiDueToday() {
@@ -213,11 +368,27 @@ export function useEmiDueToday() {
   return useQuery({
     queryKey: ['reports', 'emi-due', today],
     queryFn: () => apiClient.reports.emiDue({ fromDate: today, toDate: today }),
+    refetchInterval: 30_000,
   });
 }
 
 export function useStaffPerformance() {
   return useQuery({ queryKey: ['reports', 'staff-performance'], queryFn: () => apiClient.reports.staffPerformance() });
+}
+
+export function useCustomerLedger(customerId: string | undefined) {
+  return useQuery({
+    queryKey: ['reports', 'customer-ledger', customerId],
+    queryFn: () => apiClient.reports.customerLedger(customerId!),
+    enabled: Boolean(customerId),
+  });
+}
+
+export function useAuditLog(query?: Record<string, string>) {
+  return useQuery({
+    queryKey: ['reports', 'audit', query],
+    queryFn: () => apiClient.reports.auditReport(query),
+  });
 }
 
 export function usePaymentReconciliation() {

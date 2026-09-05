@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { colors, spacing, typography } from '@/theme/theme';
-import { Screen, PrimaryButton } from '@/components/ui';
+import { Screen, Card, PrimaryButton, LiquidMark } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
 import { ApiError } from '@sptc/shared';
 
@@ -60,25 +60,29 @@ export function BiometricLockScreen() {
 
   return (
     <Screen style={styles.container}>
-      <Text style={styles.brand}>SPTC Finance</Text>
-      <Text style={styles.subtitle}>App locked for your security</Text>
+      <View style={styles.brandBlock}>
+        <LiquidMark size={64} />
+        <Text style={styles.subtitle}>App locked for your security</Text>
+      </View>
 
       <View style={{ height: spacing.xxl }} />
 
       {checking ? null : biometricAvailable && !showPinFallback ? (
-        <PrimaryButton label="Unlock with Biometrics" onPress={attemptBiometric} />
+        <PrimaryButton label="Unlock with Biometrics" icon="finger-print" onPress={attemptBiometric} />
       ) : (
         <View style={styles.pinBlock}>
           <Text style={styles.label}>Enter your PIN</Text>
-          <TextInput
-            value={pin}
-            onChangeText={setPin}
-            keyboardType="number-pad"
-            maxLength={6}
-            secureTextEntry
-            style={styles.input}
-            autoFocus
-          />
+          <Card style={styles.inputCard}>
+            <TextInput
+              value={pin}
+              onChangeText={setPin}
+              keyboardType="number-pad"
+              maxLength={6}
+              secureTextEntry
+              style={styles.input}
+              autoFocus
+            />
+          </Card>
           <View style={{ height: spacing.lg }} />
           <PrimaryButton label="Unlock" onPress={onPinSubmit} loading={pinLoading} disabled={pin.length < 4} />
         </View>
@@ -92,20 +96,16 @@ export function BiometricLockScreen() {
 
 const styles = StyleSheet.create({
   container: { justifyContent: 'center', padding: spacing.xl },
-  brand: { ...typography.display, color: colors.brand, textAlign: 'center' },
-  subtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
+  brandBlock: { alignItems: 'center' },
+  subtitle: { ...typography.body, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md },
   pinBlock: { alignItems: 'stretch' },
   label: { ...typography.captionStrong, color: colors.textSecondary, marginBottom: spacing.sm, textAlign: 'center' },
+  inputCard: { paddingVertical: spacing.md },
   input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
     fontSize: 24,
-    letterSpacing: 6,
+    fontFamily: 'Manrope_800ExtraBold',
+    letterSpacing: 8,
     textAlign: 'center',
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
   },
 });

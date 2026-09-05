@@ -126,6 +126,10 @@ model Customer {
   city         String?
   state        String?
   pincode      String?
+  photoUrl          String?
+  referenceName     String?
+  referenceMobile   String?
+  referencePhotoUrl String?
   kycStatus    KycStatus @default(NOT_STARTED)
   pinHash      String?
   passwordHash String?

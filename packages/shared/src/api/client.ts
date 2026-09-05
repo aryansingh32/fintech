@@ -9,12 +9,18 @@ import {
 import {
   AllocationPreview,
   AppNotification,
+  AuditEvent,
   Customer,
+  CustomerListItem,
+  CustomerSummary,
   DeviceSession,
   GatewayOrder,
+  Installment,
+  LedgerEntry,
   Loan,
   LoanProduct,
   LoanProductVersion,
+  LoanSchedulePreview,
   OverdueAgingRow,
   Payment,
   Product,
@@ -59,6 +65,19 @@ export function generateClientTransactionId(): string {
  */
 export class ApiClient {
   constructor(private readonly config: ApiClientConfig) {}
+
+  /**
+   * De-dupes concurrent refresh attempts. The backend rotates the refresh
+   * token on every use (single-use, prevents replay of a stolen token) -
+   * without this, two requests that both hit a 401 around the same moment
+   * (very plausible with several screens polling on refetchInterval) would
+   * each call /token/refresh with the same old token; whichever loses the
+   * race gets "session not found" for a token that was actually still
+   * good, and is force-logged-out even though the session is fine. Sharing
+   * one in-flight promise means only one network refresh ever happens per
+   * expiry, and every caller waiting on a 401 gets its result.
+   */
+  private refreshPromise: Promise<IssuedTokens | null> | null = null;
 
   private async request<T>(
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
@@ -105,7 +124,16 @@ export class ApiClient {
     return (await response.json()) as T;
   }
 
-  private async tryRefresh(): Promise<IssuedTokens | null> {
+  private tryRefresh(): Promise<IssuedTokens | null> {
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.performRefresh().finally(() => {
+        this.refreshPromise = null;
+      });
+    }
+    return this.refreshPromise;
+  }
+
+  private async performRefresh(): Promise<IssuedTokens | null> {
     const refreshToken = await this.config.getRefreshToken();
     if (!refreshToken) {
       await this.config.onAuthFailure();
@@ -205,13 +233,37 @@ export class ApiClient {
       name: string;
       email?: string;
       addressLine1?: string;
+      addressLine2?: string;
       city?: string;
       state?: string;
       pincode?: string;
+      photoUrl?: string;
+      referenceName?: string;
+      referenceMobile?: string;
+      referencePhotoUrl?: string;
     }) => this.request<Customer>('POST', '/customers', dto),
-    search: (query: string) => this.request<Customer[]>('GET', '/customers', undefined, { query: { q: query } }),
+    update: (
+      id: string,
+      dto: Partial<{
+        name: string;
+        email: string;
+        addressLine1: string;
+        addressLine2: string;
+        city: string;
+        state: string;
+        pincode: string;
+        photoUrl: string;
+        referenceName: string;
+        referenceMobile: string;
+        referencePhotoUrl: string;
+      }>,
+    ) => this.request<Customer>('PATCH', `/customers/${id}`, dto),
+    search: (query: string) => this.request<CustomerListItem[]>('GET', '/customers', undefined, { query: { q: query } }),
+    delete: (id: string, currentPassword: string, reason?: string) =>
+      this.request<{ mode: 'deleted' | 'deactivated' }>('DELETE', `/customers/${id}`, { currentPassword, reason }),
     getById: (id: string) => this.request<Customer>('GET', `/customers/${id}`),
     repaymentProfile: (id: string) => this.request<RepaymentProfile>('GET', `/customers/${id}/repayment-profile`),
+    summary: (id: string) => this.request<CustomerSummary>('GET', `/customers/${id}/summary`),
     addNote: (id: string, note: string) => this.request<{ id: string }>('POST', `/customers/${id}/notes`, { note }),
   };
 
@@ -268,11 +320,23 @@ export class ApiClient {
       numberOfInstallments: number;
       startDate?: string;
     }) => this.request<Loan>('POST', '/loans', dto),
+    preview: (dto: {
+      loanProductVersionId: string;
+      cashPrice: number;
+      downPaymentAmount: number;
+      numberOfInstallments: number;
+      startDate?: string;
+    }) => this.request<LoanSchedulePreview>('POST', '/loans/preview', dto),
     list: (filters?: { status?: LoanStatus; customerId?: string }) =>
       this.request<Loan[]>('GET', '/loans', undefined, { query: filters }),
     getById: (id: string) => this.request<Loan>('GET', `/loans/${id}`),
     decide: (id: string, decision: 'APPROVED' | 'DECLINED' | 'MANUAL_REVIEW', reason?: string) =>
       this.request<Loan>('POST', `/loans/${id}/decision`, { decision, reason }),
+    rescheduleInstallment: (loanId: string, installmentId: string, newDueDate: string, reason: string) =>
+      this.request<Installment>('PATCH', `/loans/${loanId}/installments/${installmentId}/reschedule`, {
+        newDueDate,
+        reason,
+      }),
   };
 
   // ---------------------------------------------------------------------
@@ -289,7 +353,19 @@ export class ApiClient {
   receipts = {
     listMine: () => this.request<Receipt[]>('GET', '/receipts/me'),
     listForLoan: (loanId: string) => this.request<Receipt[]>('GET', `/receipts/loan/${loanId}`),
+    listForCustomer: (customerId: string) => this.request<Receipt[]>('GET', `/receipts/customer/${customerId}`),
     getById: (id: string) => this.request<Receipt>('GET', `/receipts/${id}`),
+  };
+
+  // ---------------------------------------------------------------------
+  // File uploads (Cloudflare R2, direct-to-storage presigned PUT)
+  // ---------------------------------------------------------------------
+  uploads = {
+    presign: (purpose: 'customer-photo' | 'reference-photo' | 'kyc-document', contentType: string) =>
+      this.request<{ uploadUrl: string; publicUrl: string; key: string }>('POST', '/uploads/presign', {
+        purpose,
+        contentType,
+      }),
   };
 
   // ---------------------------------------------------------------------
@@ -394,7 +470,7 @@ export class ApiClient {
       ),
     emiDue: (query?: Record<string, string>) => this.request<unknown[]>('GET', '/reports/emi-due', undefined, { query }),
     customerLedger: (customerId: string) =>
-      this.request<unknown[]>('GET', `/reports/customer-ledger/${customerId}`),
+      this.request<LedgerEntry[]>('GET', `/reports/customer-ledger/${customerId}`),
     loanPortfolio: (query?: Record<string, string>) =>
       this.request<{ status: string; count: number; totalPayable: string }[]>(
         'GET',
@@ -408,7 +484,8 @@ export class ApiClient {
       this.request<unknown[]>('GET', '/reports/staff-performance', undefined, { query }),
     paymentReconciliation: (query?: Record<string, string>) =>
       this.request<unknown[]>('GET', '/reports/payment-reconciliation', undefined, { query }),
-    auditReport: (query?: Record<string, string>) => this.request<unknown[]>('GET', '/reports/audit', undefined, { query }),
+    auditReport: (query?: Record<string, string>) =>
+      this.request<{ restricted: true; events: never[] } | AuditEvent[]>('GET', '/reports/audit', undefined, { query }),
   };
 
   // ---------------------------------------------------------------------

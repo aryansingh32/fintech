@@ -47,9 +47,7 @@ export function CollectPaymentScreen() {
         referenceId: referenceId.trim() || undefined,
         idempotencyKey: generateIdempotencyKey(),
       });
-      Alert.alert('Payment recorded', `Receipt ${result.receipt.receiptNumber} generated.`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      navigation.replace('ReceiptDetail', { receiptId: result.receipt.id });
     } catch (err) {
       const isNetworkError = !(err instanceof ApiError);
       if (isNetworkError) {

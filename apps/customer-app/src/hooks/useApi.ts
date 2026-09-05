@@ -6,6 +6,7 @@ export function useLoanList() {
   return useQuery({
     queryKey: ['loans', 'list'],
     queryFn: () => apiClient.myLoans.list(),
+    refetchInterval: 20_000,
   });
 }
 
@@ -14,6 +15,7 @@ export function useLoanDetail(loanId: string | undefined) {
     queryKey: ['loans', 'detail', loanId],
     queryFn: () => apiClient.myLoans.getById(loanId!),
     enabled: Boolean(loanId),
+    refetchInterval: 20_000,
   });
 }
 
@@ -21,6 +23,7 @@ export function useReceipts() {
   return useQuery({
     queryKey: ['receipts', 'me'],
     queryFn: () => apiClient.receipts.listMine(),
+    refetchInterval: 20_000,
   });
 }
 

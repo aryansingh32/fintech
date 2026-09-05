@@ -2,14 +2,17 @@
   "name": "@sptc/business-app",
   "version": "0.1.0",
   "private": true,
-  "main": "node_modules/expo/AppEntry.js",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "android": "expo run:android",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "ios": "expo run:ios"
   },
   "dependencies": {
+    "@expo-google-fonts/manrope": "^0.4.2",
     "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-community/datetimepicker": "8.0.1",
     "@react-native-community/netinfo": "11.3.1",
     "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/native": "^6.1.18",
@@ -19,6 +22,9 @@
     "expo": "~51.0.39",
     "expo-constants": "~16.0.2",
     "expo-device": "~6.0.2",
+    "expo-font": "^12.0.10",
+    "expo-image-picker": "~15.1.0",
+    "expo-local-authentication": "~14.0.1",
     "expo-notifications": "~0.28.19",
     "expo-secure-store": "~13.0.2",
     "expo-status-bar": "~1.12.1",

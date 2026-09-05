@@ -66,7 +66,7 @@ export function OverdueListScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
-  content: { paddingBottom: spacing.xxl },
+  content: { paddingBottom: 120 },
   sectionHeader: { ...typography.captionStrong, color: colors.textSecondary, marginTop: spacing.lg, marginBottom: spacing.sm },
   card: { marginBottom: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

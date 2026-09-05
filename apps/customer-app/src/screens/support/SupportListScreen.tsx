@@ -123,7 +123,7 @@ export function SupportListScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: 100 },
+  content: { padding: spacing.lg, paddingBottom: 120 },
   card: { marginBottom: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   ticketNumber: { ...typography.bodyStrong, color: colors.textPrimary },

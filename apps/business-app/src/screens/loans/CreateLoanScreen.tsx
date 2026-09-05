@@ -4,7 +4,8 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, radius, spacing, typography } from '@/theme/theme';
 import { Card, PrimaryButton } from '@/components/ui';
-import { useCreateLoan, useIdentifierSearch, useLoanProducts } from '@/hooks/useApi';
+import { useCreateLoan, useIdentifierSearch, useLoanPreview, useLoanProducts } from '@/hooks/useApi';
+import { formatDate, formatMoney } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
 import { ApiError } from '@sptc/shared';
 
@@ -34,6 +35,13 @@ export function CreateLoanScreen() {
   const [installments, setInstallments] = useState('6');
 
   const selectedVersion = loanProducts?.flatMap((p) => p.versions ?? []).find((v) => v.id === versionId);
+
+  const preview = useLoanPreview({
+    loanProductVersionId: versionId,
+    cashPrice: Number(cashPrice) || 0,
+    downPaymentAmount: Number(downPayment) || 0,
+    numberOfInstallments: Number(installments) || 0,
+  });
 
   const onSubmit = async () => {
     if (!versionId) {
@@ -110,6 +118,29 @@ export function CreateLoanScreen() {
         <NumberField label="Number of Installments" value={installments} onChangeText={setInstallments} />
       </Card>
 
+      {preview.data ? (
+        <Card style={{ marginTop: spacing.lg, backgroundColor: colors.brandSoft }}>
+          <Text style={styles.previewTitle}>Repayment Preview</Text>
+          <View style={styles.previewGrid}>
+            <PreviewItem label="Principal" value={formatMoney(preview.data.financedPrincipal)} />
+            <PreviewItem label="Interest Amount" value={formatMoney(preview.data.financeCharges)} />
+            <PreviewItem label="Fees" value={formatMoney(preview.data.feesTotal)} />
+            <PreviewItem label="Total Payable" value={formatMoney(preview.data.totalPayable)} emphasize />
+            <PreviewItem
+              label="Per EMI"
+              value={`${formatMoney(preview.data.installmentAmount)} · ${preview.data.numberOfInstallments}x`}
+            />
+            <PreviewItem label="Maturity" value={formatDate(preview.data.maturityDate)} />
+          </View>
+          <Text style={styles.previewNote}>
+            Interest is already included in Total Payable and every EMI above. You can adjust individual EMI due dates on the
+            next screen before approving this loan.
+          </Text>
+        </Card>
+      ) : versionId && cashPrice ? (
+        <Text style={[styles.caption, { marginTop: spacing.lg }]}>Calculating repayment preview...</Text>
+      ) : null}
+
       <View style={{ marginTop: spacing.xl }}>
         <PrimaryButton
           label="Continue to Repayment Summary"
@@ -119,6 +150,15 @@ export function CreateLoanScreen() {
         />
       </View>
     </ScrollView>
+  );
+}
+
+function PreviewItem({ label, value, emphasize }: { label: string; value: string; emphasize?: boolean }) {
+  return (
+    <View style={styles.previewItem}>
+      <Text style={styles.caption}>{label}</Text>
+      <Text style={emphasize ? styles.previewValueEmphasis : styles.previewValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -153,4 +193,10 @@ const styles = StyleSheet.create({
   },
   identifierRow: { padding: spacing.sm, borderRadius: radius.sm, marginTop: spacing.sm },
   identifierRowSelected: { backgroundColor: colors.brandSoft },
+  previewTitle: { ...typography.bodyStrong, color: colors.textPrimary, marginBottom: spacing.sm },
+  previewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
+  previewItem: { width: '42%' },
+  previewValue: { ...typography.bodyStrong, color: colors.textPrimary },
+  previewValueEmphasis: { ...typography.h2, color: colors.brand },
+  previewNote: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.md },
 });

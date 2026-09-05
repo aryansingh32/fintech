@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, typography } from '@/theme/theme';
-import { Screen, PrimaryButton } from '@/components/ui';
+import { Screen, Card, PrimaryButton } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
 import { AuthStackParamList } from '@/navigation/types';
 import { ApiError } from '@sptc/shared';
@@ -34,14 +34,16 @@ export function DeviceVerifyScreen({ route }: Props) {
       </Text>
 
       <View style={{ height: spacing.xl }} />
-      <TextInput
-        value={otp}
-        onChangeText={setOtp}
-        keyboardType="number-pad"
-        maxLength={6}
-        style={styles.otpInput}
-        autoFocus
-      />
+      <Card>
+        <TextInput
+          value={otp}
+          onChangeText={setOtp}
+          keyboardType="number-pad"
+          maxLength={6}
+          style={styles.otpInput}
+          autoFocus
+        />
+      </Card>
 
       <View style={{ height: spacing.lg }} />
       <PrimaryButton label="Verify Device" onPress={onSubmit} loading={loading} disabled={otp.length !== 6} />
@@ -54,15 +56,10 @@ const styles = StyleSheet.create({
   h1: { ...typography.h1, color: colors.textPrimary },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   otpInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontSize: 28,
-    letterSpacing: 8,
+    fontSize: 30,
+    fontFamily: 'Manrope_800ExtraBold',
+    letterSpacing: 10,
     textAlign: 'center',
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
   },
 });

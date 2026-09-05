@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, typography } from '@/theme/theme';
-import { Screen, PrimaryButton } from '@/components/ui';
+import { Screen, Card, PrimaryButton } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
 import { AuthStackParamList } from '@/navigation/types';
 import { ApiError } from '@sptc/shared';
@@ -34,11 +34,14 @@ export function StaffLoginScreen({ navigation }: Props) {
   return (
     <Screen style={styles.container}>
       <View style={styles.brandBlock}>
+        <View style={styles.markOrb}>
+          <Text style={styles.markGlyph}>S</Text>
+        </View>
         <Text style={styles.brand}>SPTC Finance</Text>
         <Text style={styles.tagline}>Business</Text>
       </View>
 
-      <View>
+      <Card>
         <Text style={styles.label}>Mobile number</Text>
         <TextInput
           value={mobile}
@@ -59,10 +62,10 @@ export function StaffLoginScreen({ navigation }: Props) {
           placeholder="••••••••"
           placeholderTextColor={colors.textSecondary}
         />
+      </Card>
 
-        <View style={{ height: spacing.xl }} />
-        <PrimaryButton label="Log In" onPress={onSubmit} loading={loading} disabled={!mobile || !password} />
-      </View>
+      <View style={{ height: spacing.xl }} />
+      <PrimaryButton label="Log In" icon="arrow-forward" onPress={onSubmit} loading={loading} disabled={!mobile || !password} size="lg" />
     </Screen>
   );
 }
@@ -70,17 +73,23 @@ export function StaffLoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { justifyContent: 'center', padding: spacing.xl },
   brandBlock: { alignItems: 'center', marginBottom: spacing.xxl },
-  brand: { ...typography.display, color: colors.brand },
+  markOrb: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  markGlyph: { fontSize: 30, fontFamily: 'Manrope_800ExtraBold', color: colors.accent },
+  brand: { ...typography.display, color: colors.textPrimary },
   tagline: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   label: { ...typography.captionStrong, color: colors.textSecondary, marginBottom: spacing.sm },
   input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontSize: 16,
+    fontSize: 17,
+    fontFamily: 'Manrope_700Bold',
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
+    paddingVertical: spacing.xs,
   },
 });

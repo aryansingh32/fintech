@@ -46,7 +46,15 @@ export function RootNavigator() {
       ) : isLocked ? (
         <BiometricLockScreen />
       ) : (
-        <Stack.Navigator>
+        <Stack.Navigator
+          screenOptions={{
+            animation: 'slide_from_right',
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: colors.surfaceSolid },
+            headerTitleStyle: { fontFamily: 'Manrope_700Bold', fontSize: 18, color: colors.textPrimary },
+            headerTintColor: colors.accentEnd,
+          }}
+        >
           <Stack.Screen name="Main" component={MainTabsNavigator} options={{ headerShown: false }} />
           <Stack.Screen name="LoanDetail" component={LoanDetailScreen} options={{ title: 'Loan Details' }} />
           <Stack.Screen name="PayEmi" component={PayEmiScreen} options={{ title: 'Pay EMI' }} />

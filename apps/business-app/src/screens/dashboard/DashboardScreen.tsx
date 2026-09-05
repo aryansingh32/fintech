@@ -1,11 +1,11 @@
 import React from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { colors, spacing, typography } from '@/theme/theme';
-import { Card, PrimaryButton } from '@/components/ui';
+import { BalanceCard, Card, IconTile, PrimaryButton } from '@/components/ui';
 import { StatTile } from '@/components/StatTile';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useDailyCollection, useEmiDueToday, useLoanPortfolio, useLoans, useOverdueAging } from '@/hooks/useApi';
@@ -56,11 +56,18 @@ export function DashboardScreen() {
 
       <View style={styles.header}>
         <Text style={styles.title}>Dashboard</Text>
-        <PrimaryButton label="🔍 Search" onPress={() => navigation.navigate('GlobalSearch')} variant="secondary" />
+        <Pressable onPress={() => navigation.navigate('GlobalSearch')}>
+          <IconTile icon="search" size={44} iconSize={20} bg={colors.surfaceMuted} iconColor={colors.textPrimary} />
+        </Pressable>
       </View>
 
+      <BalanceCard style={styles.heroCard}>
+        <Text style={styles.heroLabel}>TODAY'S COLLECTION</Text>
+        <Text style={styles.heroAmount}>{formatMoney(dailyCollection.data?.total ?? 0)}</Text>
+        <Text style={styles.heroCaption}>{dailyCollection.data?.count ?? 0} payments collected today</Text>
+      </BalanceCard>
+
       <View style={styles.grid}>
-        <StatTile label="Today's Collection" value={formatMoney(dailyCollection.data?.total ?? 0)} accent="success" />
         <StatTile label="Total Overdue" value={formatMoney(overdueTotal)} accent="danger" />
         <StatTile label="Active Loans" value={String(activeLoans)} />
         <StatTile label="Due Today" value={String(emiDueToday.data?.length ?? 0)} />
@@ -83,16 +90,16 @@ export function DashboardScreen() {
 
       <View style={styles.quickActions}>
         <View style={styles.quickActionItem}>
-          <PrimaryButton label="New Customer" onPress={() => navigation.navigate('CreateCustomer')} variant="secondary" />
+          <PrimaryButton label="New Customer" icon="person-add" onPress={() => navigation.navigate('CreateCustomer')} variant="secondary" />
         </View>
         <View style={styles.quickActionItem}>
-          <PrimaryButton label="Collections" onPress={() => navigation.navigate('Collections')} variant="secondary" />
+          <PrimaryButton label="Collections" icon="cash" onPress={() => navigation.navigate('Collections')} variant="secondary" />
         </View>
       </View>
 
       {identity?.isGlobal ? (
         <View style={{ marginTop: spacing.lg }}>
-          <PrimaryButton label="Manage Loan Products" onPress={() => navigation.navigate('LoanProductsAdmin')} variant="secondary" />
+          <PrimaryButton label="Manage Loan Products" icon="settings" onPress={() => navigation.navigate('LoanProductsAdmin')} variant="secondary" />
         </View>
       ) : null}
     </ScrollView>
@@ -101,11 +108,15 @@ export function DashboardScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  content: { padding: spacing.lg, paddingBottom: 120 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
   title: { ...typography.h1, color: colors.textPrimary },
+  heroCard: { marginBottom: spacing.lg },
+  heroLabel: { ...typography.captionStrong, color: colors.accent, letterSpacing: 1 },
+  heroAmount: { ...typography.display, color: colors.textInverse, marginTop: spacing.sm },
+  heroCaption: { ...typography.caption, color: colors.textInverseSecondary, marginTop: spacing.xs },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  pendingCard: { marginTop: spacing.md, backgroundColor: colors.statusPendingSoft, borderColor: colors.statusPending },
+  pendingCard: { marginTop: spacing.md, backgroundColor: colors.statusPendingSoft },
   sectionTitle: { ...typography.bodyStrong, color: colors.textPrimary },
   body: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   quickActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },

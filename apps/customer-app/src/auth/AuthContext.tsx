@@ -121,7 +121,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         await clearTokens();
         await SecureStore.deleteItemAsync(CUSTOMER_ID_KEY);
+        await SecureStore.deleteItemAsync(MOBILE_KEY);
         setCustomerId(null);
+        setMobile(null);
         setIsLocked(false);
         setStatus('unauthenticated');
       },

@@ -19,6 +19,7 @@ import { ReportsModule } from './reports/reports.module';
 import { SyncModule } from './sync/sync.module';
 import { KycModule } from './kyc/kyc.module';
 import { ReceiptsModule } from './receipts/receipts.module';
+import { StorageModule } from './storage/storage.module';
 import { AppController } from './app.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AccessGuard } from './common/guards/access.guard';
@@ -44,6 +45,7 @@ import { AccessGuard } from './common/guards/access.guard';
     SyncModule,
     KycModule,
     ReceiptsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [

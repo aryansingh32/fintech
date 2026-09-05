@@ -18,6 +18,7 @@ export enum NotificationEvent {
   SUPPORT_MESSAGE_RECEIVED = 'SUPPORT_MESSAGE_RECEIVED',
   SECURITY_ALERT = 'SECURITY_ALERT',
   PAYMENT_REVERSED = 'PAYMENT_REVERSED',
+  EMI_RESCHEDULED = 'EMI_RESCHEDULED',
 }
 
 export type SupportedLocale = 'en' | 'hi';
@@ -105,6 +106,13 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationEvent, NotificationTempl
     body: {
       en: 'Your payment of ₹{{amount}} for {{loanNumber}} was reversed: {{reason}}.',
       hi: '{{loanNumber}} के लिए आपका ₹{{amount}} का भुगतान वापस लिया गया: {{reason}}।',
+    },
+  },
+  [NotificationEvent.EMI_RESCHEDULED]: {
+    title: { en: 'EMI date updated', hi: 'EMI तिथि अपडेट की गई' },
+    body: {
+      en: 'Your EMI for {{loanNumber}} has been moved to {{dueDate}}.',
+      hi: '{{loanNumber}} की आपकी EMI {{dueDate}} पर स्थानांतरित कर दी गई है।',
     },
   },
 };

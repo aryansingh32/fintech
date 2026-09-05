@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, spacing, typography } from '@/theme/theme';
-import { Screen, PrimaryButton } from '@/components/ui';
+import { Screen, Card, PrimaryButton } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
 import { ApiError } from '@sptc/shared';
 
@@ -35,26 +35,30 @@ export function CreatePinScreen() {
 
       <View style={{ height: spacing.xl }} />
       <Text style={styles.label}>New PIN (4-6 digits)</Text>
-      <TextInput
-        value={pin}
-        onChangeText={setPinValue}
-        keyboardType="number-pad"
-        maxLength={6}
-        secureTextEntry
-        style={styles.input}
-        autoFocus
-      />
+      <Card style={styles.inputCard}>
+        <TextInput
+          value={pin}
+          onChangeText={setPinValue}
+          keyboardType="number-pad"
+          maxLength={6}
+          secureTextEntry
+          style={styles.input}
+          autoFocus
+        />
+      </Card>
 
       <View style={{ height: spacing.lg }} />
       <Text style={styles.label}>Confirm PIN</Text>
-      <TextInput
-        value={confirmPin}
-        onChangeText={setConfirmPin}
-        keyboardType="number-pad"
-        maxLength={6}
-        secureTextEntry
-        style={styles.input}
-      />
+      <Card style={styles.inputCard}>
+        <TextInput
+          value={confirmPin}
+          onChangeText={setConfirmPin}
+          keyboardType="number-pad"
+          maxLength={6}
+          secureTextEntry
+          style={styles.input}
+        />
+      </Card>
 
       <View style={{ height: spacing.xl }} />
       <PrimaryButton label="Create PIN" onPress={onSubmit} loading={loading} disabled={!canSubmit} />
@@ -67,16 +71,12 @@ const styles = StyleSheet.create({
   h1: { ...typography.h1, color: colors.textPrimary },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   label: { ...typography.captionStrong, color: colors.textSecondary, marginBottom: spacing.sm },
+  inputCard: { paddingVertical: spacing.md },
   input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontSize: 20,
-    letterSpacing: 6,
+    fontSize: 22,
+    fontFamily: 'Manrope_800ExtraBold',
+    letterSpacing: 8,
     textAlign: 'center',
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
   },
 });

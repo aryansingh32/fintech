@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { LoanStatus, SubjectType } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RequireSubject } from '../common/decorators/require-subject.decorator';
@@ -8,7 +8,7 @@ import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { Permission } from '../rbac/permissions';
 import { LoansService } from './loans.service';
 import { LoanProductsService } from './loan-products.service';
-import { CreateLoanDto, ApproveLoanDto } from './dto/loan.dto';
+import { CreateLoanDto, ApproveLoanDto, PreviewLoanDto, RescheduleInstallmentDto } from './dto/loan.dto';
 import { CreateLoanProductDto, CreateLoanProductVersionDto } from './dto/loan-product.dto';
 
 @UseGuards(JwtAuthGuard)
@@ -21,6 +21,12 @@ export class LoansController {
   @Post()
   create(@Body() dto: CreateLoanDto, @CurrentUser() user: AuthUser) {
     return this.loans.create(dto, user);
+  }
+
+  @RequirePermissions(Permission.LOAN_CREATE)
+  @Post('preview')
+  preview(@Body() dto: PreviewLoanDto) {
+    return this.loans.previewSchedule(dto);
   }
 
   @RequirePermissions(Permission.LOAN_VIEW)
@@ -43,6 +49,17 @@ export class LoansController {
   @Post(':id/decision')
   decide(@Param('id') id: string, @Body() dto: ApproveLoanDto, @CurrentUser() user: AuthUser) {
     return this.loans.decide(id, dto, user);
+  }
+
+  @RequirePermissions(Permission.LOAN_RESCHEDULE)
+  @Patch(':id/installments/:installmentId/reschedule')
+  reschedule(
+    @Param('id') id: string,
+    @Param('installmentId') installmentId: string,
+    @Body() dto: RescheduleInstallmentDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.loans.rescheduleInstallment(id, installmentId, dto, user);
   }
 }
 

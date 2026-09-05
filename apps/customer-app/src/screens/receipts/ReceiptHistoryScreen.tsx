@@ -41,7 +41,7 @@ export function ReceiptHistoryScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg },
+  content: { padding: spacing.lg, paddingBottom: 120 },
   card: { marginBottom: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   receiptNumber: { ...typography.bodyStrong, color: colors.textPrimary },

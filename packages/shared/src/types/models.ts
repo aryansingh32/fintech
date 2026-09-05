@@ -40,10 +40,90 @@ export interface Customer {
   city?: string | null;
   state?: string | null;
   pincode?: string | null;
+  photoUrl?: string | null;
+  referenceName?: string | null;
+  referenceMobile?: string | null;
+  referencePhotoUrl?: string | null;
   kycStatus: KycStatus;
   isActive: boolean;
   createdAt: IsoDateString;
   updatedAt: IsoDateString;
+}
+
+export interface CustomerLoanSummary {
+  loanId: string;
+  outstanding: string;
+  overdue: string;
+}
+
+export interface LedgerEntry {
+  id: string;
+  customerId: string;
+  loanId?: string | null;
+  entryType: string;
+  debit: Money;
+  credit: Money;
+  balanceAfter: Money;
+  referenceType: string;
+  referenceId: string;
+  description: string;
+  createdAt: IsoDateString;
+}
+
+export interface AuditEvent {
+  id: string;
+  actorType: 'CUSTOMER' | 'STAFF' | 'SYSTEM';
+  actorId?: string | null;
+  role?: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  beforeState?: unknown;
+  afterState?: unknown;
+  reason?: string | null;
+  ipAddress?: string | null;
+  deviceId?: string | null;
+  sessionId?: string | null;
+  createdAt: IsoDateString;
+}
+
+export interface CustomerLoanBadges {
+  hasActiveLoan: boolean;
+  hasOverdueLoan: boolean;
+  hasCompletedLoan: boolean;
+  hasNoLoans: boolean;
+  outstanding: string;
+}
+
+export interface CustomerListItem extends Customer {
+  loanSummary: CustomerLoanBadges;
+}
+
+export interface PreviewInstallment {
+  sequence: number;
+  dueDate: IsoDateString;
+  principalAmount: Money;
+  chargesAmount: Money;
+  totalAmount: Money;
+}
+
+export interface LoanSchedulePreview {
+  financedPrincipal: Money;
+  financeCharges: Money;
+  feesTotal: Money;
+  totalPayable: Money;
+  installmentAmount: Money;
+  numberOfInstallments: number;
+  maturityDate: IsoDateString;
+  installments: PreviewInstallment[];
+}
+
+export interface CustomerSummary {
+  totalPaid: string;
+  totalOutstanding: string;
+  totalOverdue: string;
+  nextDue: { loanId: string; installmentId: string; amount: string; dueDate: IsoDateString } | null;
+  perLoan: CustomerLoanSummary[];
 }
 
 export interface KYCRecord {
