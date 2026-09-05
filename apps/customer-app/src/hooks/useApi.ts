@@ -95,13 +95,3 @@ export function useAllocationPreview(loanId: string | undefined, amount: number)
   });
 }
 
-export function useInitiatePayment() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ loanId, amount }: { loanId: string; amount: number }) =>
-      apiClient.payments.customerInitiate(loanId, amount),
-    onSuccess: (_data, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['loans', 'detail', vars.loanId] });
-    },
-  });
-}

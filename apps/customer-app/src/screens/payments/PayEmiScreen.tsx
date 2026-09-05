@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
-import { colors, radius, spacing, typography } from '@/theme/theme';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import RazorpayCheckout from 'react-native-razorpay';
+import { colors, spacing, typography } from '@/theme/theme';
 import { Card, ErrorState, LoadingState, PrimaryButton } from '@/components/ui';
-import { useAllocationPreview, useInitiatePayment } from '@/hooks/useApi';
+import { useAllocationPreview } from '@/hooks/useApi';
+import { useMyProfile } from '@/hooks/useProfile';
+import { apiClient } from '@/api/apiClient';
 import { formatMoney } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
 import { ApiError, AllocationComponent } from '@sptc/shared';
@@ -18,22 +22,71 @@ const COMPONENT_LABEL: Record<AllocationComponent, string> = {
 };
 
 export function PayEmiScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'PayEmi'>>();
   const { loanId, suggestedAmount } = route.params;
   const [amount, setAmount] = useState(suggestedAmount);
   const parsedAmount = Number(amount) || 0;
 
   const preview = useAllocationPreview(loanId, parsedAmount);
-  const initiate = useInitiatePayment();
+  const { data: profile } = useMyProfile();
+  const [isPaying, setIsPaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  if (initiate.isError) {
-    const message =
-      initiate.error instanceof ApiError
-        ? initiate.error.message
-        : "We couldn't complete your payment right now. Your account has not been charged.";
+  const onPay = async () => {
+    setError(null);
+    setIsPaying(true);
+    try {
+      // Step 1: open a checkout session. No local record is created yet -
+      // the gateway's order IS the pending state until it's confirmed.
+      const order = await apiClient.payments.customerInitiate(loanId, parsedAmount);
+
+      // Step 2: the native checkout SDK handles card/UPI/wallet entry.
+      // A rejected promise here means the customer cancelled or the
+      // checkout itself failed - never treated as a successful payment.
+      const checkoutResult = await RazorpayCheckout.open({
+        key: order.keyId,
+        order_id: order.orderId,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'SPTC Finance',
+        description: 'EMI Payment',
+        prefill: { name: profile?.name, contact: profile?.mobile },
+        theme: { color: '#2C3FE0' },
+      });
+
+      // Step 3: verify the SDK's signed callback and post the payment.
+      // The signature can only have been produced by Razorpay (it's an
+      // HMAC keyed with our secret, which never leaves the server) - so
+      // this is authoritative confirmation, not a bare client claim.
+      await apiClient.payments.customerConfirm({
+        loanId,
+        razorpayOrderId: checkoutResult.razorpay_order_id,
+        razorpayPaymentId: checkoutResult.razorpay_payment_id,
+        razorpaySignature: checkoutResult.razorpay_signature,
+        amount: parsedAmount,
+      });
+
+      Alert.alert('Payment successful', 'Your receipt is now available.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else if (isRazorpayCancellation(err)) {
+        // Customer closed the checkout sheet - not an error worth alarming them with.
+      } else {
+        setError("We couldn't complete your payment right now. Your account has not been charged.");
+      }
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  if (error) {
     return (
       <View style={styles.screen}>
-        <ErrorState message={message} onRetry={() => initiate.reset()} />
+        <ErrorState message={error} onRetry={() => setError(null)} />
       </View>
     );
   }
@@ -72,16 +125,21 @@ export function PayEmiScreen() {
       <View style={{ marginTop: spacing.xl }}>
         <PrimaryButton
           label={`Pay ${formatMoney(parsedAmount)}`}
-          onPress={() => initiate.mutate({ loanId, amount: parsedAmount })}
-          loading={initiate.isPending}
+          onPress={onPay}
+          loading={isPaying}
           disabled={parsedAmount <= 0}
         />
       </View>
       <Text style={styles.disclaimer}>
-        Your payment is processed securely. You'll only be charged after confirmation from the payment provider.
+        Your payment is processed securely by Razorpay. You'll only be charged after confirmation from the payment
+        provider.
       </Text>
     </ScrollView>
   );
+}
+
+function isRazorpayCancellation(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err;
 }
 
 const styles = StyleSheet.create({

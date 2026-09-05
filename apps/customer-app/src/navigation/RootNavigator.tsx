@@ -8,6 +8,7 @@ import { RootStackParamList } from './types';
 import { AuthNavigator } from './AuthNavigator';
 import { MainTabsNavigator } from './MainTabsNavigator';
 import { CreatePinScreen } from '@/screens/auth/CreatePinScreen';
+import { BiometricLockScreen } from '@/screens/auth/BiometricLockScreen';
 import { LoanDetailScreen } from '@/screens/loans/LoanDetailScreen';
 import { PayEmiScreen } from '@/screens/payments/PayEmiScreen';
 import { ReceiptDetailScreen } from '@/screens/receipts/ReceiptDetailScreen';
@@ -20,7 +21,7 @@ import { TermsScreen } from '@/screens/profile/TermsScreen';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
-  const { status } = useAuth();
+  const { status, isLocked } = useAuth();
 
   return (
     <NavigationContainer
@@ -42,6 +43,8 @@ export function RootNavigator() {
         <AuthNavigator />
       ) : status === 'pin_setup_required' ? (
         <CreatePinScreen />
+      ) : isLocked ? (
+        <BiometricLockScreen />
       ) : (
         <Stack.Navigator>
           <Stack.Screen name="Main" component={MainTabsNavigator} options={{ headerShown: false }} />
