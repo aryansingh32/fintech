@@ -16,6 +16,7 @@ interface AuthContextValue {
   verifyOtp: (mobile: string, otp: string) => Promise<void>;
   setPin: (pin: string) => Promise<void>;
   pinLogin: (mobile: string, pin: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   unlock: () => void;
   logout: () => Promise<void>;
 }
@@ -109,6 +110,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await SecureStore.setItemAsync(MOBILE_KEY, m);
         setCustomerId(res.customerId);
         setMobile(m);
+        setIsLocked(false);
+        setStatus('authenticated');
+      },
+      loginWithGoogle: async (idToken: string) => {
+        const device = await getDeviceInfo();
+        const res = await apiClient.customerAuth.googleLogin(idToken, device);
+        await persistTokens(res.accessToken, res.refreshToken);
+        await SecureStore.setItemAsync(CUSTOMER_ID_KEY, res.customerId);
+        setCustomerId(res.customerId);
+        try {
+          const profile = await apiClient.myProfile.get();
+          await SecureStore.setItemAsync(MOBILE_KEY, profile.mobile);
+          setMobile(profile.mobile);
+        } catch {
+          // Non-fatal - the mobile number is only used to prefill the PIN-unlock fallback.
+        }
         setIsLocked(false);
         setStatus('authenticated');
       },

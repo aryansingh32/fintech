@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { assertBranchAccess } from '../rbac/branch-scope.util';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEvent } from '../notifications/notification-events';
 import { SubmitKycDocumentDto } from './dto/kyc.dto';
 
 /**
@@ -19,6 +21,7 @@ export class KycService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private async assertCustomerAccess(customerId: string, user: AuthUser): Promise<void> {
@@ -67,12 +70,22 @@ export class KycService {
     await this.assertCustomerAccess(record.customerId, staff);
 
     const status = decision === 'VERIFIED' ? KycStatus.VERIFIED : KycStatus.REJECTED;
+    const notificationIds: string[] = [];
     const updated = await this.prisma.$transaction(async (tx) => {
       const rec = await tx.kYCRecord.update({
         where: { id: recordId },
         data: { status, verifiedByStaffId: staff.id, verifiedAt: new Date(), rejectionReason: reason },
       });
       await tx.customer.update({ where: { id: record.customerId }, data: { kycStatus: status } });
+
+      notificationIds.push(
+        ...(await this.notifications.enqueue(tx, {
+          event: decision === 'VERIFIED' ? NotificationEvent.KYC_VERIFIED : NotificationEvent.KYC_REJECTED,
+          customerId: record.customerId,
+          payload: { documentType: record.documentType, reason: reason ?? '' },
+        })),
+      );
+
       return rec;
     });
 
@@ -85,6 +98,8 @@ export class KycService {
       entityId: recordId,
       reason,
     });
+
+    await this.notifications.dispatchAll(notificationIds);
 
     return updated;
   }

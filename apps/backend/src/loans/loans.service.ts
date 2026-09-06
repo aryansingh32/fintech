@@ -255,6 +255,14 @@ export class LoansService {
           });
         }
 
+        // Freeze the current default agreement wording alongside this loan's numeric
+        // terms, if the business has published one - a later template edit must
+        // never alter what this customer already agreed to.
+        const defaultTemplate = await tx.agreementTemplate.findFirst({
+          where: { key: 'LOAN_AGREEMENT_DEFAULT', isActive: true },
+          orderBy: { version: 'desc' },
+        });
+
         const agreement = await tx.agreement.create({
           data: {
             loanId,
@@ -271,6 +279,9 @@ export class LoansService {
                 dueDate: i.dueDate,
                 totalAmount: i.totalAmount.toString(),
               })),
+              agreementTemplateTitle: defaultTemplate?.title ?? null,
+              agreementTemplateContent: defaultTemplate?.content ?? null,
+              agreementTemplateVersion: defaultTemplate?.version ?? null,
             } as never,
           },
         });

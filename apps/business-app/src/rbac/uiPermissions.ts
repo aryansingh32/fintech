@@ -33,6 +33,10 @@ export function canUseSupport(role: StaffRole): boolean {
   return role === StaffRole.OWNER || role === StaffRole.MANAGER || role === StaffRole.SUPPORT_AGENT;
 }
 
+export function canManageAgreements(role: StaffRole): boolean {
+  return role === StaffRole.OWNER || role === StaffRole.MANAGER;
+}
+
 export function roleLabel(role: StaffRole): string {
   return role
     .split('_')

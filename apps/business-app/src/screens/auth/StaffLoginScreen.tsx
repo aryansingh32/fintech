@@ -4,16 +4,18 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, typography } from '@/theme/theme';
 import { Screen, Card, PrimaryButton } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
+import { signInWithGoogle } from '@/auth/googleAuth';
 import { AuthStackParamList } from '@/navigation/types';
 import { ApiError } from '@sptc/shared';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'StaffLogin'>;
 
 export function StaffLoginScreen({ navigation }: Props) {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const onSubmit = async () => {
     setLoading(true);
@@ -28,6 +30,19 @@ export function StaffLoginScreen({ navigation }: Props) {
       Alert.alert('Login failed', err instanceof ApiError ? err.message : 'Please check your credentials.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      const idToken = await signInWithGoogle();
+      if (!idToken) return;
+      await loginWithGoogle(idToken);
+    } catch (err) {
+      Alert.alert('Could not sign in with Google', err instanceof ApiError ? err.message : (err as Error)?.message ?? 'Please try again.');
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -66,6 +81,13 @@ export function StaffLoginScreen({ navigation }: Props) {
 
       <View style={{ height: spacing.xl }} />
       <PrimaryButton label="Log In" icon="arrow-forward" onPress={onSubmit} loading={loading} disabled={!mobile || !password} size="lg" />
+
+      <View style={styles.dividerRow}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>or</Text>
+        <View style={styles.dividerLine} />
+      </View>
+      <PrimaryButton label="Sign in with Google" icon="logo-google" variant="outline" onPress={onGoogleSignIn} loading={googleLoading} />
     </Screen>
   );
 }
@@ -92,4 +114,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     paddingVertical: spacing.xs,
   },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.lg },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { ...typography.caption, color: colors.textSecondary, marginHorizontal: spacing.sm },
 });

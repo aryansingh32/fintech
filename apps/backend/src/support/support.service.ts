@@ -7,7 +7,7 @@ import { NotificationEvent } from '../notifications/notification-events';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { assertBranchAccess, branchWhereClause } from '../rbac/branch-scope.util';
 import { generateTicketNumber, retryOnConflict } from '../common/id-generators';
-import { CreateTicketDto } from './dto/support.dto';
+import { AttachmentInputDto, CreateTicketDto } from './dto/support.dto';
 
 @Injectable()
 export class SupportService {
@@ -26,10 +26,15 @@ export class SupportService {
           category: dto.category,
           status: SupportTicketStatus.OPEN,
           messages: {
-            create: { senderType: SupportSenderType.CUSTOMER, senderId: customerId, message: dto.message },
+            create: {
+              senderType: SupportSenderType.CUSTOMER,
+              senderId: customerId,
+              message: dto.message ?? '',
+              attachments: dto.attachment ? { create: attachmentData(dto.attachment, SubjectType.CUSTOMER, customerId) } : undefined,
+            },
           },
         },
-        include: { messages: true },
+        include: { messages: { include: { attachments: true } } },
       }),
     );
 
@@ -48,7 +53,7 @@ export class SupportService {
     return this.prisma.supportTicket.findMany({
       where: { customerId },
       orderBy: { updatedAt: 'desc' },
-      include: { messages: { orderBy: { createdAt: 'asc' } } },
+      include: { messages: { orderBy: { createdAt: 'asc' }, include: { attachments: true } } },
     });
   }
 
@@ -60,14 +65,14 @@ export class SupportService {
         customer: branchWhereClause(user),
       },
       orderBy: { updatedAt: 'desc' },
-      include: { customer: true },
+      include: { customer: true, messages: { orderBy: { createdAt: 'asc' }, include: { attachments: true } } },
     });
   }
 
   async findById(ticketId: string, user: AuthUser) {
     const ticket = await this.prisma.supportTicket.findUnique({
       where: { id: ticketId },
-      include: { messages: { orderBy: { createdAt: 'asc' } }, customer: true },
+      include: { messages: { orderBy: { createdAt: 'asc' }, include: { attachments: true } }, customer: true },
     });
     if (!ticket) throw new NotFoundException('Support ticket not found.');
 
@@ -79,12 +84,20 @@ export class SupportService {
     return ticket;
   }
 
-  async addMessage(ticketId: string, user: AuthUser, message: string) {
+  async addMessage(ticketId: string, user: AuthUser, message: string, attachment?: AttachmentInputDto) {
     const ticket = await this.findById(ticketId, user);
     const senderType = user.subjectType === SubjectType.CUSTOMER ? SupportSenderType.CUSTOMER : SupportSenderType.STAFF;
+    const uploaderType = user.subjectType === SubjectType.CUSTOMER ? SubjectType.CUSTOMER : SubjectType.STAFF;
 
     const created = await this.prisma.supportMessage.create({
-      data: { ticketId, senderType, senderId: user.id, message },
+      data: {
+        ticketId,
+        senderType,
+        senderId: user.id,
+        message: message ?? '',
+        attachments: attachment ? { create: attachmentData(attachment, uploaderType, user.id) } : undefined,
+      },
+      include: { attachments: true },
     });
 
     const newStatus =
@@ -165,4 +178,8 @@ export class SupportService {
     });
     return updated;
   }
+}
+
+function attachmentData(input: AttachmentInputDto, uploadedByType: SubjectType, uploadedById: string) {
+  return { url: input.url, mimeType: input.mimeType, sizeBytes: input.sizeBytes, uploadedByType, uploadedById };
 }

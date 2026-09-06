@@ -9,6 +9,7 @@ import { StaffAuthService } from './staff-auth.service';
 import { SessionService } from './session.service';
 import { RefreshTokenDto } from './dto/customer-auth.dto';
 import { StaffLoginDto, VerifyStaffDeviceOtpDto } from './dto/staff-auth.dto';
+import { GoogleLoginDto } from './dto/google-auth.dto';
 
 @Controller({ path: 'auth/staff', version: '1' })
 export class StaffAuthController {
@@ -33,6 +34,12 @@ export class StaffAuthController {
   @Post('token/refresh')
   refresh(@Body() dto: RefreshTokenDto) {
     return this.sessions.refresh(dto.refreshToken);
+  }
+
+  @Public()
+  @Post('google')
+  googleLogin(@Body() dto: GoogleLoginDto, @Ip() ip: string) {
+    return this.staffAuth.googleLogin(dto.idToken, dto.device, ip);
   }
 
   @UseGuards(JwtAuthGuard)

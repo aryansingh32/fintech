@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateLoanProductDto, CreateLoanProductVersionDto } from './dto/loan-product.dto';
+import {
+  CreateLoanProductDto,
+  CreateLoanProductVersionDto,
+  UpdateLoanProductDto,
+  UpdateLoanProductVersionDto,
+} from './dto/loan-product.dto';
 
 @Injectable()
 export class LoanProductsService {
@@ -15,6 +20,78 @@ export class LoanProductsService {
       where: { isActive: true },
       include: { versions: { where: { isActive: true }, orderBy: { versionNumber: 'desc' } } },
     });
+  }
+
+  /** Includes inactive/deleted plans and versions - used by the admin screen so staff can still see (and reactivate) them. */
+  listAll() {
+    return this.prisma.loanProduct.findMany({
+      include: { versions: { orderBy: { versionNumber: 'desc' } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Only touches name/description/isActive. Financial terms are never edited
+   * in place on the LoanProduct or an existing LoanProductVersion - a rate or
+   * fee change always goes through createVersion() so loans already
+   * originated against an older version are provably unaffected.
+   */
+  async update(loanProductId: string, dto: UpdateLoanProductDto) {
+    const loanProduct = await this.prisma.loanProduct.findUnique({ where: { id: loanProductId } });
+    if (!loanProduct) throw new NotFoundException('Loan product not found.');
+
+    return this.prisma.loanProduct.update({
+      where: { id: loanProductId },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
+    });
+  }
+
+  /**
+   * Soft-delete: marks the plan and all of its versions inactive so it stops
+   * appearing for new loans. Never a hard delete - loans reference a specific
+   * LoanProductVersion row via a required FK, and every financial figure on
+   * those loans was captured at origination time rather than read live from
+   * the version, so this is always safe regardless of loan history.
+   */
+  async remove(loanProductId: string) {
+    const loanProduct = await this.prisma.loanProduct.findUnique({ where: { id: loanProductId } });
+    if (!loanProduct) throw new NotFoundException('Loan product not found.');
+
+    await this.prisma.$transaction([
+      this.prisma.loanProductVersion.updateMany({
+        where: { loanProductId },
+        data: { isActive: false },
+      }),
+      this.prisma.loanProduct.update({ where: { id: loanProductId }, data: { isActive: false } }),
+    ]);
+    return { success: true };
+  }
+
+  /** Toggle a single version's availability without affecting the plan or its other versions. */
+  async updateVersion(loanProductId: string, versionId: string, dto: UpdateLoanProductVersionDto) {
+    const version = await this.prisma.loanProductVersion.findFirst({
+      where: { id: versionId, loanProductId },
+    });
+    if (!version) throw new NotFoundException('Loan product version not found.');
+
+    return this.prisma.loanProductVersion.update({
+      where: { id: versionId },
+      data: { ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}) },
+    });
+  }
+
+  /** Soft-delete a single version (isActive=false) - stops it being offered for new loans; existing loans are unaffected. */
+  async removeVersion(loanProductId: string, versionId: string) {
+    const version = await this.prisma.loanProductVersion.findFirst({
+      where: { id: versionId, loanProductId },
+    });
+    if (!version) throw new NotFoundException('Loan product version not found.');
+
+    return this.prisma.loanProductVersion.update({ where: { id: versionId }, data: { isActive: false } });
   }
 
   /**

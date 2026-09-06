@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { LoanStatus, SubjectType } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RequireSubject } from '../common/decorators/require-subject.decorator';
@@ -9,7 +9,12 @@ import { Permission } from '../rbac/permissions';
 import { LoansService } from './loans.service';
 import { LoanProductsService } from './loan-products.service';
 import { CreateLoanDto, ApproveLoanDto, PreviewLoanDto, RescheduleInstallmentDto } from './dto/loan.dto';
-import { CreateLoanProductDto, CreateLoanProductVersionDto } from './dto/loan-product.dto';
+import {
+  CreateLoanProductDto,
+  CreateLoanProductVersionDto,
+  UpdateLoanProductDto,
+  UpdateLoanProductVersionDto,
+} from './dto/loan-product.dto';
 
 @UseGuards(JwtAuthGuard)
 @RequireSubject(SubjectType.STAFF)
@@ -95,13 +100,41 @@ export class LoanProductsController {
 
   @RequirePermissions(Permission.LOAN_VIEW)
   @Get()
-  list() {
-    return this.loanProducts.list();
+  list(@Query('all') all?: string) {
+    return all === 'true' ? this.loanProducts.listAll() : this.loanProducts.list();
+  }
+
+  @RequirePermissions(Permission.LOAN_PRODUCT_MANAGE)
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateLoanProductDto) {
+    return this.loanProducts.update(id, dto);
+  }
+
+  @RequirePermissions(Permission.LOAN_PRODUCT_MANAGE)
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.loanProducts.remove(id);
   }
 
   @RequirePermissions(Permission.LOAN_PRODUCT_MANAGE)
   @Post(':id/versions')
   createVersion(@Param('id') id: string, @Body() dto: CreateLoanProductVersionDto) {
     return this.loanProducts.createVersion(id, dto);
+  }
+
+  @RequirePermissions(Permission.LOAN_PRODUCT_MANAGE)
+  @Patch(':id/versions/:versionId')
+  updateVersion(
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+    @Body() dto: UpdateLoanProductVersionDto,
+  ) {
+    return this.loanProducts.updateVersion(id, versionId, dto);
+  }
+
+  @RequirePermissions(Permission.LOAN_PRODUCT_MANAGE)
+  @Delete(':id/versions/:versionId')
+  removeVersion(@Param('id') id: string, @Param('versionId') versionId: string) {
+    return this.loanProducts.removeVersion(id, versionId);
   }
 }

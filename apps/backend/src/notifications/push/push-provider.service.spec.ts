@@ -62,4 +62,34 @@ describe('PushProviderService', () => {
     const service = new PushProviderService(new ConfigService({ PUSH_PROVIDER: 'expo' }));
     await expect(service.send(['ExponentPushToken[abc]'], 'T', 'B')).rejects.toThrow(ServiceUnavailableException);
   });
+
+  it('with PUSH_PROVIDER=fcm, is configured only when a FirebaseAdminService reports itself configured', () => {
+    const unconfiguredFirebase = { isConfigured: () => false } as never;
+    const configuredFirebase = { isConfigured: () => true } as never;
+    expect(new PushProviderService(new ConfigService({ PUSH_PROVIDER: 'fcm' }), unconfiguredFirebase).isConfigured()).toBe(false);
+    expect(new PushProviderService(new ConfigService({ PUSH_PROVIDER: 'fcm' }), configuredFirebase).isConfigured()).toBe(true);
+  });
+
+  it('sends via FCM and maps registration-token-not-registered to invalidTokens', async () => {
+    const sendEachForMulticast = jest.fn().mockResolvedValue({
+      successCount: 1,
+      failureCount: 1,
+      responses: [
+        { success: true },
+        { success: false, error: { code: 'messaging/registration-token-not-registered', message: 'stale' } },
+      ],
+    });
+    const firebase = {
+      isConfigured: () => true,
+      getMessaging: () => ({ sendEachForMulticast }),
+    } as never;
+    const service = new PushProviderService(new ConfigService({ PUSH_PROVIDER: 'fcm' }), firebase);
+
+    const result = await service.send(['fcm-good', 'fcm-stale'], 'Payment received', 'We received your payment.');
+
+    expect(sendEachForMulticast).toHaveBeenCalledWith(
+      expect.objectContaining({ tokens: ['fcm-good', 'fcm-stale'], notification: { title: 'Payment received', body: 'We received your payment.' } }),
+    );
+    expect(result).toEqual({ successCount: 1, failureCount: 1, invalidTokens: ['fcm-stale'] });
+  });
 });

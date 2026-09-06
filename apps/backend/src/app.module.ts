@@ -20,6 +20,8 @@ import { SyncModule } from './sync/sync.module';
 import { KycModule } from './kyc/kyc.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { StorageModule } from './storage/storage.module';
+import { AgreementsModule } from './agreements/agreements.module';
+import { FirebaseAdminModule } from './firebase/firebase-admin.module';
 import { AppController } from './app.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AccessGuard } from './common/guards/access.guard';
@@ -30,6 +32,7 @@ import { AccessGuard } from './common/guards/access.guard';
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     PrismaModule,
+    FirebaseAdminModule,
     AuditModule,
     AuthModule,
     RbacModule,
@@ -46,6 +49,7 @@ import { AccessGuard } from './common/guards/access.guard';
     KycModule,
     ReceiptsModule,
     StorageModule,
+    AgreementsModule,
   ],
   controllers: [AppController],
   providers: [

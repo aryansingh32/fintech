@@ -14,6 +14,7 @@ import {
   SetCustomerPinDto,
   VerifyCustomerOtpDto,
 } from './dto/customer-auth.dto';
+import { GoogleLoginDto } from './dto/google-auth.dto';
 
 @Controller({ path: 'auth/customer', version: '1' })
 export class CustomerAuthController {
@@ -38,6 +39,12 @@ export class CustomerAuthController {
   @Post('pin/login')
   pinLogin(@Body() dto: CustomerPinLoginDto, @Ip() ip: string) {
     return this.customerAuth.pinLogin(dto.mobile, dto.pin, dto.device, ip);
+  }
+
+  @Public()
+  @Post('google')
+  googleLogin(@Body() dto: GoogleLoginDto, @Ip() ip: string) {
+    return this.customerAuth.googleLogin(dto.idToken, dto.device, ip);
   }
 
   @Public()

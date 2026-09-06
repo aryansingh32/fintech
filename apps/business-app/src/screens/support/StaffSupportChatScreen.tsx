@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { colors, radius, spacing, typography } from '@/theme/theme';
 import { ErrorState, LoadingState, PrimaryButton } from '@/components/ui';
-import { useEscalateTicket, useStaffAddMessage, useStaffSupportTicket, useUpdateTicketStatus } from '@/hooks/useApi';
+import {
+  useEscalateTicket,
+  useStaffAddMessage,
+  useStaffSupportTicket,
+  useUpdateTicketStatus,
+  useUploadSupportAttachment,
+} from '@/hooks/useApi';
 import { formatDate } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
-import { SupportSenderType, SupportTicketStatus } from '@sptc/shared';
+import { ApiError, SupportSenderType, SupportTicketStatus } from '@sptc/shared';
 
 export function StaffSupportChatScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'SupportChat'>>();
   const { data: ticket, isLoading, isError, error, refetch } = useStaffSupportTicket(route.params.ticketId);
   const addMessage = useStaffAddMessage(route.params.ticketId);
+  const uploadAttachment = useUploadSupportAttachment();
   const escalate = useEscalateTicket(route.params.ticketId);
   const updateStatus = useUpdateTicketStatus(route.params.ticketId);
   const [text, setText] = useState('');
@@ -23,8 +32,29 @@ export function StaffSupportChatScreen() {
 
   const onSend = () => {
     if (!text.trim()) return;
-    addMessage.mutate(text.trim());
+    addMessage.mutate({ message: text.trim() });
     setText('');
+  };
+
+  const onAttach = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Allow photo library access to attach an image.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    try {
+      const attachment = await uploadAttachment.mutateAsync({
+        uri: asset.uri,
+        contentType: asset.mimeType ?? 'image/jpeg',
+      });
+      addMessage.mutate({ message: text.trim(), attachment });
+      setText('');
+    } catch (err) {
+      Alert.alert('Could not send photo', err instanceof ApiError ? err.message : 'Please try again.');
+    }
   };
 
   const onEscalate = () => {
@@ -62,7 +92,12 @@ export function StaffSupportChatScreen() {
           return (
             <View style={[styles.bubbleRow, isMine && styles.bubbleRowMine]}>
               <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{item.message}</Text>
+                {item.attachments?.map((a) => (
+                  <Image key={a.id} source={{ uri: a.url }} style={styles.attachmentImage} resizeMode="cover" />
+                ))}
+                {item.message ? (
+                  <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{item.message}</Text>
+                ) : null}
               </View>
               <Text style={styles.timestamp}>{formatDate(item.createdAt)}</Text>
             </View>
@@ -71,6 +106,9 @@ export function StaffSupportChatScreen() {
       />
 
       <View style={styles.inputRow}>
+        <Pressable onPress={onAttach} style={styles.attachButton} disabled={uploadAttachment.isPending}>
+          <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
+        </Pressable>
         <TextInput
           value={text}
           onChangeText={setText}
@@ -80,7 +118,12 @@ export function StaffSupportChatScreen() {
           multiline
         />
         <View style={{ width: 90 }}>
-          <PrimaryButton label="Send" onPress={onSend} loading={addMessage.isPending} disabled={!text.trim()} />
+          <PrimaryButton
+            label="Send"
+            onPress={onSend}
+            loading={addMessage.isPending || uploadAttachment.isPending}
+            disabled={!text.trim()}
+          />
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -101,6 +144,7 @@ const styles = StyleSheet.create({
   bubbleMine: { backgroundColor: colors.brand },
   bubbleText: { ...typography.body, color: colors.textPrimary },
   bubbleTextMine: { color: colors.textInverse },
+  attachmentImage: { width: 200, height: 200, borderRadius: radius.sm, marginBottom: spacing.xs, backgroundColor: colors.surfaceMuted },
   timestamp: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   inputRow: {
     flexDirection: 'row',
@@ -111,5 +155,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: 'flex-end',
   },
+  attachButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   input: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, maxHeight: 100, color: colors.textPrimary },
 });

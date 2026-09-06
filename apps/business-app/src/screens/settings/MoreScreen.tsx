@@ -7,7 +7,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { colors, spacing, typography } from '@/theme/theme';
 import { Card } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
-import { roleLabel } from '@/rbac/uiPermissions';
+import { canManageAgreements, roleLabel } from '@/rbac/uiPermissions';
 import { MainTabParamList, RootStackParamList } from '@/navigation/types';
 
 type Nav = CompositeNavigationProp<BottomTabNavigationProp<MainTabParamList, 'More'>, NativeStackNavigationProp<RootStackParamList>>;
@@ -25,9 +25,11 @@ export function MoreScreen() {
         </Card>
       ) : null}
 
-      <MenuRow label="Support Tickets" onPress={() => navigation.navigate('SupportList')} />
       <MenuRow label="Activity Log" onPress={() => navigation.navigate('AuditLog')} />
       {identity?.isGlobal ? <MenuRow label="Manage Loan Products" onPress={() => navigation.navigate('LoanProductsAdmin')} /> : null}
+      {identity && canManageAgreements(identity.role) ? (
+        <MenuRow label="Manage Agreements" onPress={() => navigation.navigate('AgreementTemplatesAdmin')} />
+      ) : null}
       <MenuRow label="Profile & Logout" onPress={() => navigation.navigate('Profile')} />
 
       {identity?.isGlobal ? (

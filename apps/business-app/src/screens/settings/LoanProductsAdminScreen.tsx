@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation } from '@tanstack/react-query';
 import { colors, radius, spacing, typography } from '@/theme/theme';
 import { Card, PrimaryButton } from '@/components/ui';
 import { useLoanProducts } from '@/hooks/useApi';
 import { apiClient } from '@/api/apiClient';
 import { ApiError } from '@sptc/shared';
+import type { LoanProduct, LoanProductVersion } from '@sptc/shared';
 
 const INTEREST_TYPES = ['ZERO_COST', 'FLAT', 'REDUCING'] as const;
 const FREQUENCIES = ['MONTHLY', 'BIWEEKLY', 'WEEKLY'] as const;
@@ -58,14 +60,7 @@ export function LoanProductsAdminScreen() {
       <Text style={styles.title}>Loan Products</Text>
 
       {loanProducts?.map((product) => (
-        <Card key={product.id} style={styles.card}>
-          <Text style={styles.name}>{product.name}</Text>
-          {(product.versions ?? []).map((v) => (
-            <Text key={v.id} style={styles.caption}>
-              v{v.versionNumber} · {v.interestType} · {v.installmentFrequency} · {v.minInstallments}-{v.maxInstallments} installments
-            </Text>
-          ))}
-        </Card>
+        <LoanProductCard key={product.id} product={product} onChanged={refetch} />
       ))}
 
       <Text style={styles.sectionTitle}>New Plan</Text>
@@ -89,7 +84,11 @@ export function LoanProductsAdminScreen() {
 
         {interestType !== 'ZERO_COST' ? (
           <>
-            <Text style={styles.label}>Annual Interest Rate (%)</Text>
+            <Text style={styles.label}>
+              {interestType === 'FLAT'
+                ? 'Flat Interest Rate (%) - charged once on the total loan amount'
+                : 'Annual Interest Rate (%) - reducing balance'}
+            </Text>
             <TextInput value={interestRate} onChangeText={setInterestRate} keyboardType="decimal-pad" style={styles.input} />
           </>
         ) : null}
@@ -122,13 +121,120 @@ export function LoanProductsAdminScreen() {
   );
 }
 
+function LoanProductCard({ product, onChanged }: { product: LoanProduct; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState(product.name);
+  const [busy, setBusy] = useState(false);
+
+  const run = async (action: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await action();
+      onChanged();
+    } catch (err) {
+      Alert.alert('Action failed', err instanceof ApiError ? err.message : 'Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveName = () => {
+    if (!draftName.trim() || draftName.trim() === product.name) {
+      setEditing(false);
+      return;
+    }
+    run(() => apiClient.loanProducts.update(product.id, { name: draftName.trim() })).then(() => setEditing(false));
+  };
+
+  const toggleActive = () => run(() => apiClient.loanProducts.update(product.id, { isActive: !product.isActive }));
+
+  const confirmDelete = () => {
+    Alert.alert(
+      'Delete plan?',
+      `"${product.name}" will stop being offered for new loans. Loans already issued on it are unaffected.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => run(() => apiClient.loanProducts.remove(product.id)) },
+      ],
+    );
+  };
+
+  const toggleVersionActive = (version: LoanProductVersion) =>
+    run(() => apiClient.loanProducts.updateVersion(product.id, version.id, { isActive: !version.isActive }));
+
+  return (
+    <Card style={{ ...styles.card, ...(product.isActive ? null : styles.cardInactive) }}>
+      <View style={styles.cardHeaderRow}>
+        {editing ? (
+          <TextInput
+            value={draftName}
+            onChangeText={setDraftName}
+            style={[styles.input, { flex: 1, marginRight: spacing.sm }]}
+            autoFocus
+            onSubmitEditing={saveName}
+          />
+        ) : (
+          <Text style={styles.name}>
+            {product.name}
+            {!product.isActive ? ' (inactive)' : ''}
+          </Text>
+        )}
+
+        <View style={styles.cardActions}>
+          {editing ? (
+            <Pressable onPress={saveName} style={styles.iconButton} disabled={busy}>
+              <Ionicons name="checkmark" size={18} color={colors.textPrimary} />
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => setEditing(true)} style={styles.iconButton} disabled={busy}>
+              <Ionicons name="pencil" size={16} color={colors.textPrimary} />
+            </Pressable>
+          )}
+          <Pressable onPress={toggleActive} style={styles.iconButton} disabled={busy}>
+            <Ionicons name={product.isActive ? 'pause' : 'play'} size={16} color={colors.textPrimary} />
+          </Pressable>
+          <Pressable onPress={confirmDelete} style={styles.iconButton} disabled={busy}>
+            <Ionicons name="trash" size={16} color={colors.statusOverdue} />
+          </Pressable>
+        </View>
+      </View>
+
+      {(product.versions ?? []).map((v) => (
+        <View key={v.id} style={styles.versionRow}>
+          <Text style={[styles.caption, !v.isActive && styles.captionInactive]}>
+            v{v.versionNumber} · {v.interestType} · {v.installmentFrequency} · {v.minInstallments}-{v.maxInstallments} installments
+            {!v.isActive ? ' · inactive' : ''}
+          </Text>
+          <Pressable onPress={() => toggleVersionActive(v)} disabled={busy}>
+            <Text style={styles.versionToggle}>{v.isActive ? 'Deactivate' : 'Activate'}</Text>
+          </Pressable>
+        </View>
+      ))}
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   title: { ...typography.h1, color: colors.textPrimary, marginBottom: spacing.lg },
   card: { marginBottom: spacing.md },
-  name: { ...typography.bodyStrong, color: colors.textPrimary },
-  caption: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  cardInactive: { opacity: 0.6 },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardActions: { flexDirection: 'row', gap: spacing.xs },
+  iconButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceMuted,
+  },
+  name: { ...typography.bodyStrong, color: colors.textPrimary, flex: 1 },
+  caption: { ...typography.caption, color: colors.textSecondary, marginTop: 2, flex: 1 },
+  captionInactive: { textDecorationLine: 'line-through' },
+  versionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
+  versionToggle: { ...typography.caption, color: colors.accent, fontWeight: '600' as const },
   sectionTitle: { ...typography.h2, color: colors.textPrimary, marginTop: spacing.xl, marginBottom: spacing.md },
   label: { ...typography.captionStrong, color: colors.textSecondary, marginTop: spacing.md, marginBottom: spacing.sm },
   input: {

@@ -8,6 +8,7 @@ export type MainTabParamList = {
   Customers: undefined;
   Loans: undefined;
   Collections: undefined;
+  Support: undefined;
   Reports: undefined;
   More: undefined;
 };
@@ -28,6 +29,7 @@ export type RootStackParamList = {
   SupportList: undefined;
   SupportChat: { ticketId: string };
   LoanProductsAdmin: undefined;
+  AgreementTemplatesAdmin: undefined;
   Profile: undefined;
   SecurityDevices: undefined;
 };

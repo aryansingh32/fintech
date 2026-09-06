@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { AuditActorType, OtpPurpose, SubjectType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { OtpService } from './otp.service';
 import { SessionService, IssuedTokens } from './session.service';
 import { DeviceInfoDto } from './dto/device-info.dto';
+import { FirebaseAdminService } from '../firebase/firebase-admin.service';
 
 export type StaffLoginResult =
   | { status: 'DEVICE_VERIFICATION_REQUIRED'; requestId: string; devOtp?: string }
@@ -18,7 +19,30 @@ export class StaffAuthService {
     private readonly otp: OtpService,
     private readonly sessions: SessionService,
     private readonly audit: AuditService,
+    private readonly firebase: FirebaseAdminService,
   ) {}
+
+  /** Google Sign-In for an existing staff account matched by verified email - never a self-signup path (staff accounts are provisioned by an Owner). */
+  async googleLogin(idToken: string, device: DeviceInfoDto, ipAddress?: string): Promise<StaffLoginResult> {
+    const auth = this.firebase.getAuth();
+    if (!auth) throw new ServiceUnavailableException('Google Sign-In is not configured.');
+
+    let email: string | undefined;
+    try {
+      const decoded = await auth.verifyIdToken(idToken);
+      email = decoded.email_verified ? decoded.email : undefined;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired Google sign-in token.');
+    }
+    if (!email) throw new UnauthorizedException('Your Google account has no verified email.');
+
+    const staff = await this.prisma.staffUser.findFirst({ where: { email, isActive: true } });
+    if (!staff) {
+      throw new UnauthorizedException('No staff account is linked to this Google email yet.');
+    }
+
+    return this.completeLogin(staff.id, device, ipAddress);
+  }
 
   /**
    * Password login. A staff member on a device that has never verified with

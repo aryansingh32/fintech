@@ -87,6 +87,34 @@ describe('calculateEmiSchedule', () => {
     expect(reducing.totalPayable.lessThan(flat.totalPayable)).toBe(true);
   });
 
+  it('FLAT rate is charged once on the full principal regardless of term length (not pro-rated by tenure)', () => {
+    const sixMonth = calculateEmiSchedule({
+      cashPrice: 10000,
+      downPaymentAmount: 0,
+      numberOfInstallments: 6,
+      installmentFrequency: 'MONTHLY',
+      interestType: 'FLAT',
+      interestRateAnnual: 18,
+      feeRules: [],
+      startDate: new Date('2026-01-01T00:00:00Z'),
+    });
+    const twelveMonth = calculateEmiSchedule({
+      cashPrice: 10000,
+      downPaymentAmount: 0,
+      numberOfInstallments: 12,
+      installmentFrequency: 'MONTHLY',
+      interestType: 'FLAT',
+      interestRateAnnual: 18,
+      feeRules: [],
+      startDate: new Date('2026-01-01T00:00:00Z'),
+    });
+
+    // Same principal, same flat rate, different tenure - finance charge must be identical (Rs.1,800),
+    // not halved for the shorter term the way an annualized/pro-rated calculation would.
+    expect(sixMonth.financeCharges.toFixed(2)).toBe('1800.00');
+    expect(twelveMonth.financeCharges.toFixed(2)).toBe('1800.00');
+  });
+
   it('monthly due dates clamp correctly across month-end boundaries (31 Jan -> 28/29 Feb)', () => {
     const result = calculateEmiSchedule({
       cashPrice: 6000,

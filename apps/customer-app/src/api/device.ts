@@ -15,14 +15,18 @@ async function getOrCreateDeviceIdentifier(): Promise<string> {
 }
 
 /**
- * Requests notification permission and fetches this device's Expo push
- * token. Returns undefined on a simulator/emulator without push services,
- * if the user declines the permission, or if the token fetch itself fails -
- * callers must treat a missing token as "no push for this device" rather
- * than retrying indefinitely (the backend already handles a customer with
- * zero registered push tokens by failing that notification closed).
+ * Requests notification permission and fetches this device's native push
+ * token - on Android this IS the FCM registration token (backed by the
+ * "sptc-finance-platform" Firebase project via google-services.json), sent
+ * directly to the backend's FCM provider rather than through Expo's shared
+ * push relay. Returns undefined on a simulator/emulator without push
+ * services, if the user declines the permission, or if the token fetch
+ * itself fails - callers must treat a missing token as "no push for this
+ * device" rather than retrying indefinitely (the backend already handles a
+ * customer with zero registered push tokens by failing that notification
+ * closed).
  */
-async function getExpoPushToken(): Promise<string | undefined> {
+async function getNativePushToken(): Promise<string | undefined> {
   if (!Device.isDevice) return undefined;
   try {
     const existing = await Notifications.getPermissionsAsync();
@@ -40,7 +44,7 @@ async function getExpoPushToken(): Promise<string | undefined> {
       });
     }
 
-    const token = await Notifications.getExpoPushTokenAsync();
+    const token = await Notifications.getDevicePushTokenAsync();
     return token.data;
   } catch {
     return undefined;
@@ -49,7 +53,7 @@ async function getExpoPushToken(): Promise<string | undefined> {
 
 export async function getDeviceInfo(): Promise<DeviceInfo> {
   const deviceIdentifier = await getOrCreateDeviceIdentifier();
-  const pushToken = await getExpoPushToken();
+  const pushToken = await getNativePushToken();
   return {
     deviceIdentifier,
     platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',

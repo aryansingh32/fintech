@@ -16,7 +16,14 @@ export interface EmiCalculationInput {
   numberOfInstallments: number;
   installmentFrequency: InstallmentFrequencyInput;
   interestType: InterestType;
-  interestRateAnnual?: Decimal.Value; // percent, e.g. 18 for 18% p.a.
+  /**
+   * Percent, e.g. 18 for 18%. For FLAT, this is charged once on the full
+   * financed principal for the whole loan term (not pro-rated by tenure and
+   * not compounded) - "18% flat" on a Rs.10,000 loan is always Rs.1,800 in
+   * finance charges, whether the term is 3 months or 12. For REDUCING, this
+   * is a true annual percentage rate used in the standard amortizing formula.
+   */
+  interestRateAnnual?: Decimal.Value;
   feeRules: FeeRuleInput[];
   startDate: Date;
 }
@@ -114,8 +121,8 @@ function calculateFinanceCharges(
   const periodsPerYear = PERIODS_PER_YEAR[frequency];
 
   if (interestType === 'FLAT') {
-    const tenureYears = new Decimal(n).dividedBy(periodsPerYear);
-    return principal.times(rate).times(tenureYears);
+    // Charged once on the full principal for the whole term - not annualized/pro-rated.
+    return principal.times(rate);
   }
 
   // REDUCING balance: standard amortizing-loan EMI formula.

@@ -1,4 +1,5 @@
 import {
+  AgreementTemplateKey,
   AllocationComponent,
   InstallmentFrequency,
   InstallmentStatus,
@@ -131,11 +132,14 @@ export interface KYCRecord {
   customerId: string;
   documentType: KycDocumentType;
   maskedIdentifier: string;
+  documentRef: string;
   status: KycStatus;
+  verifiedByStaffId?: string | null;
   verifiedAt?: IsoDateString | null;
   rejectionReason?: string | null;
   expiresAt?: IsoDateString | null;
   createdAt: IsoDateString;
+  updatedAt: IsoDateString;
 }
 
 export interface StaffUserSummary {
@@ -225,6 +229,21 @@ export interface Agreement {
   version: number;
   termsSnapshot: Record<string, unknown>;
   documentRef?: string | null;
+  updatedByStaffId?: string | null;
+  updatedAt?: IsoDateString | null;
+  acceptedByCustomerAt?: IsoDateString | null;
+  acceptedIp?: string | null;
+  createdAt: IsoDateString;
+}
+
+export interface AgreementTemplate {
+  id: string;
+  key: AgreementTemplateKey;
+  version: number;
+  title: string;
+  content: string;
+  isActive: boolean;
+  createdByStaffId: string;
   createdAt: IsoDateString;
 }
 
@@ -307,6 +326,13 @@ export interface AllocationPreview {
   lines: AllocationPreviewLine[];
 }
 
+export interface SupportAttachment {
+  id: string;
+  url: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
 export interface SupportMessage {
   id: string;
   ticketId: string;
@@ -314,6 +340,7 @@ export interface SupportMessage {
   senderId?: string | null;
   message: string;
   createdAt: IsoDateString;
+  attachments?: SupportAttachment[];
 }
 
 export interface SupportTicket {

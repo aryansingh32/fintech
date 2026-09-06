@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/apiClient';
-import { LoanStatus, SupportTicketStatus } from '@sptc/shared';
+import { AgreementTemplateKey, LoanStatus, SupportAttachmentInput, SupportTicketStatus } from '@sptc/shared';
 
 // ---------------------------------------------------------------------
 // Sessions / devices
@@ -182,7 +182,7 @@ export function useAddIdentifier() {
 // Loan products
 // ---------------------------------------------------------------------
 export function useLoanProducts() {
-  return useQuery({ queryKey: ['loan-products'], queryFn: () => apiClient.loanProducts.list() });
+  return useQuery({ queryKey: ['loan-products'], queryFn: () => apiClient.loanProducts.list({ all: true }) });
 }
 
 // ---------------------------------------------------------------------
@@ -302,12 +302,50 @@ export function useReversePayment() {
 }
 
 // ---------------------------------------------------------------------
+// Agreements
+// ---------------------------------------------------------------------
+export function useActiveAgreementTemplate(key: AgreementTemplateKey) {
+  return useQuery({
+    queryKey: ['agreement-templates', key, 'active'],
+    queryFn: () => apiClient.agreementTemplates.getActive(key),
+    retry: false,
+  });
+}
+
+export function useAgreementTemplateVersions(key: AgreementTemplateKey) {
+  return useQuery({
+    queryKey: ['agreement-templates', key, 'versions'],
+    queryFn: () => apiClient.agreementTemplates.listVersions(key),
+  });
+}
+
+export function usePublishAgreementTemplate(key: AgreementTemplateKey) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: { title: string; content: string }) => apiClient.agreementTemplates.publish(key, dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agreement-templates', key] });
+    },
+  });
+}
+
+export function useUpdateLoanAgreement(loanId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: { documentRef?: string; termsSnapshot?: Record<string, unknown> }) =>
+      apiClient.loanAgreements.update(loanId, dto),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loans', 'detail', loanId] }),
+  });
+}
+
+// ---------------------------------------------------------------------
 // Support
 // ---------------------------------------------------------------------
 export function useStaffSupportTickets(filters?: { status?: SupportTicketStatus; assignedToMe?: boolean }) {
   return useQuery({
     queryKey: ['support', 'tickets', filters],
     queryFn: () => apiClient.support.list(filters),
+    refetchInterval: 15_000,
   });
 }
 
@@ -316,14 +354,29 @@ export function useStaffSupportTicket(id: string | undefined) {
     queryKey: ['support', 'ticket', id],
     queryFn: () => apiClient.support.getById(id!),
     enabled: Boolean(id),
-    refetchInterval: 15_000,
+    refetchInterval: 5_000,
+  });
+}
+
+/** Presigns an R2 upload then PUTs the file directly to storage, returning the public URL to attach to a support message. */
+export function useUploadSupportAttachment() {
+  return useMutation({
+    mutationFn: async ({ uri, contentType }: { uri: string; contentType: string }) => {
+      const { uploadUrl, publicUrl } = await apiClient.uploads.presign('support-attachment', contentType);
+      const file = await fetch(uri);
+      const blob = await file.blob();
+      const putResponse = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
+      if (!putResponse.ok) throw new Error('Upload failed. Please try again.');
+      return { url: publicUrl, mimeType: contentType, sizeBytes: blob.size } satisfies SupportAttachmentInput;
+    },
   });
 }
 
 export function useStaffAddMessage(ticketId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (message: string) => apiClient.support.addMessage(ticketId, message),
+    mutationFn: ({ message, attachment }: { message: string; attachment?: SupportAttachmentInput }) =>
+      apiClient.support.addMessage(ticketId, message, attachment),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['support', 'ticket', ticketId] }),
   });
 }

@@ -9,6 +9,7 @@ const KEY_PREFIX: Record<UploadPurpose, string> = {
   [UploadPurpose.CUSTOMER_PHOTO]: 'customer-photos',
   [UploadPurpose.REFERENCE_PHOTO]: 'reference-photos',
   [UploadPurpose.KYC_DOCUMENT]: 'kyc-documents',
+  [UploadPurpose.SUPPORT_ATTACHMENT]: 'support-attachments',
 };
 
 const PRESIGN_TTL_SECONDS = 300;

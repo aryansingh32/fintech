@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '@/theme/theme';
 import { Card, EmptyState, ErrorState, LoadingState } from '@/components/ui';
 import { useKycStatus } from '@/hooks/useApi';
@@ -17,7 +17,7 @@ const STATUS_COLOR: Record<KycStatus, { fg: string; bg: string }> = {
 };
 
 export function KycStatusScreen() {
-  const { data: records, isLoading, isError, error, refetch } = useKycStatus();
+  const { data: records, isLoading, isError, error, refetch, isRefetching } = useKycStatus();
 
   if (isLoading) return <LoadingState label="Loading KYC status..." />;
   if (isError) return <ErrorState message={error instanceof Error ? error.message : 'Please try again.'} onRetry={refetch} />;
@@ -26,9 +26,14 @@ export function KycStatusScreen() {
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.textPrimary} />}
+    >
       {records.map((record) => {
         const color = STATUS_COLOR[record.status];
+        const isImage = /\.(png|jpe?g|webp|heic)$/i.test(record.documentRef);
         return (
           <Card key={record.id} style={styles.card}>
             <View style={styles.row}>
@@ -39,7 +44,19 @@ export function KycStatusScreen() {
             </View>
             <Text style={styles.masked}>{record.maskedIdentifier}</Text>
             <Text style={styles.caption}>Submitted {formatDate(record.createdAt)}</Text>
+            {record.status === KycStatus.VERIFIED && record.verifiedAt ? (
+              <Text style={styles.caption}>Verified {formatDate(record.verifiedAt)}</Text>
+            ) : null}
             {record.rejectionReason ? <Text style={styles.rejectionReason}>{record.rejectionReason}</Text> : null}
+            {record.documentRef ? (
+              isImage ? (
+                <Image source={{ uri: record.documentRef }} style={styles.documentImage} resizeMode="cover" />
+              ) : (
+                <Text style={styles.docLink} onPress={() => Linking.openURL(record.documentRef)}>
+                  View submitted document
+                </Text>
+              )
+            ) : null}
           </Card>
         );
       })}
@@ -56,6 +73,8 @@ const styles = StyleSheet.create({
   masked: { ...typography.body, color: colors.textPrimary, marginTop: spacing.sm, fontFamily: 'monospace' },
   caption: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
   rejectionReason: { ...typography.caption, color: colors.statusOverdue, marginTop: spacing.sm },
+  documentImage: { width: '100%', height: 180, borderRadius: radius.md, marginTop: spacing.md, backgroundColor: colors.surfaceMuted },
+  docLink: { ...typography.captionStrong, color: colors.accent, marginTop: spacing.md, textDecorationLine: 'underline' },
   badge: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   badgeText: { ...typography.captionStrong },
 });

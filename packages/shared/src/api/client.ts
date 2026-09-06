@@ -1,5 +1,6 @@
 import { ApiError, ApiErrorBody, DeviceInfo, IssuedTokens } from '../types/api';
 import {
+  AgreementTemplateKey,
   AllocationComponent,
   LoanStatus,
   PaymentMethod,
@@ -7,6 +8,8 @@ import {
   SupportTicketStatus,
 } from '../types/enums';
 import {
+  Agreement,
+  AgreementTemplate,
   AllocationPreview,
   AppNotification,
   AuditEvent,
@@ -31,6 +34,12 @@ import {
 } from '../types/models';
 
 export type IdentityDomain = 'customer' | 'staff';
+
+export interface SupportAttachmentInput {
+  url: string;
+  mimeType: string;
+  sizeBytes: number;
+}
 
 export interface ApiClientConfig {
   baseUrl: string;
@@ -133,25 +142,49 @@ export class ApiClient {
     return this.refreshPromise;
   }
 
+  /**
+   * Only a definitive rejection from the server (the refresh token itself is
+   * invalid/expired/revoked) should wipe the session. A network blip, timeout,
+   * or 5xx has nothing to do with whether the session is still valid - treating
+   * those the same as a rejected token force-logs-out staff mid-task the moment
+   * connectivity hiccups (common for collection agents in the field), even
+   * though the refresh token would have worked fine on the next try.
+   */
   private async performRefresh(): Promise<IssuedTokens | null> {
     const refreshToken = await this.config.getRefreshToken();
     if (!refreshToken) {
       await this.config.onAuthFailure();
       return null;
     }
+    let response: Response;
     try {
       const path = `/auth/${this.config.domain}/token/refresh`;
-      const response = await fetch(this.buildUrl(path), {
+      response = await fetch(this.buildUrl(path), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
       });
-      if (!response.ok) throw new Error('refresh failed');
+    } catch {
+      // Network-level failure (unreachable host, timeout, dropped connection) - not a
+      // verdict on the refresh token. Leave the stored session alone so the next
+      // request can retry once connectivity returns.
+      return null;
+    }
+    if (response.status === 401 || response.status === 403 || response.status === 404) {
+      // The server has definitively rejected this refresh token - it's genuinely
+      // dead (expired, revoked, already rotated). Only now is it correct to log out.
+      await this.config.onAuthFailure();
+      return null;
+    }
+    if (!response.ok) {
+      // Server-side error (5xx) unrelated to token validity - don't destroy the session.
+      return null;
+    }
+    try {
       const tokens = (await response.json()) as IssuedTokens;
       await this.config.onTokensRefreshed(tokens);
       return tokens;
     } catch {
-      await this.config.onAuthFailure();
       return null;
     }
   }
@@ -193,6 +226,13 @@ export class ApiClient {
         { mobile, pin, device },
         { auth: false },
       ),
+    googleLogin: (idToken: string, device: DeviceInfo) =>
+      this.request<IssuedTokens & { customerId: string }>(
+        'POST',
+        '/auth/customer/google',
+        { idToken, device },
+        { auth: false },
+      ),
     setPin: (pin: string) => this.request<{ success: true }>('POST', '/auth/customer/pin/set', { pin }),
     logout: () => this.request<{ success: true }>('POST', '/auth/customer/logout'),
     logoutOtherDevices: () =>
@@ -218,6 +258,11 @@ export class ApiClient {
         { mobile, otp, device },
         { auth: false },
       ),
+    googleLogin: (idToken: string, device: DeviceInfo) =>
+      this.request<
+        | { status: 'DEVICE_VERIFICATION_REQUIRED'; requestId: string; devOtp?: string }
+        | (IssuedTokens & { status: 'SUCCESS'; staffUserId: string })
+      >('POST', '/auth/staff/google', { idToken, device }, { auth: false }),
     logout: () => this.request<{ success: true }>('POST', '/auth/staff/logout'),
     logoutOtherDevices: () =>
       this.request<{ success: true; revokedSessions: number }>('POST', '/auth/staff/logout-other-devices'),
@@ -301,9 +346,18 @@ export class ApiClient {
   loanProducts = {
     create: (dto: { name: string; description?: string }) =>
       this.request<LoanProduct>('POST', '/loan-products', dto),
-    list: () => this.request<LoanProduct[]>('GET', '/loan-products'),
+    list: (options?: { all?: boolean }) =>
+      this.request<LoanProduct[]>('GET', '/loan-products', undefined, { query: { all: options?.all } }),
+    update: (loanProductId: string, dto: { name?: string; description?: string; isActive?: boolean }) =>
+      this.request<LoanProduct>('PATCH', `/loan-products/${loanProductId}`, dto),
+    remove: (loanProductId: string) =>
+      this.request<{ success: boolean }>('DELETE', `/loan-products/${loanProductId}`),
     createVersion: (loanProductId: string, dto: Record<string, unknown>) =>
       this.request<LoanProductVersion>('POST', `/loan-products/${loanProductId}/versions`, dto),
+    updateVersion: (loanProductId: string, versionId: string, dto: { isActive?: boolean }) =>
+      this.request<LoanProductVersion>('PATCH', `/loan-products/${loanProductId}/versions/${versionId}`, dto),
+    removeVersion: (loanProductId: string, versionId: string) =>
+      this.request<LoanProductVersion>('DELETE', `/loan-products/${loanProductId}/versions/${versionId}`),
   };
 
   // ---------------------------------------------------------------------
@@ -361,7 +415,10 @@ export class ApiClient {
   // File uploads (Cloudflare R2, direct-to-storage presigned PUT)
   // ---------------------------------------------------------------------
   uploads = {
-    presign: (purpose: 'customer-photo' | 'reference-photo' | 'kyc-document', contentType: string) =>
+    presign: (
+      purpose: 'customer-photo' | 'reference-photo' | 'kyc-document' | 'support-attachment',
+      contentType: string,
+    ) =>
       this.request<{ uploadUrl: string; publicUrl: string; key: string }>('POST', '/uploads/presign', {
         purpose,
         contentType,
@@ -432,21 +489,45 @@ export class ApiClient {
   // Support
   // ---------------------------------------------------------------------
   support = {
-    createTicket: (category: SupportCategory, message: string) =>
-      this.request<SupportTicket>('POST', '/support/tickets', { category, message }),
+    createTicket: (category: SupportCategory, message: string, attachment?: SupportAttachmentInput) =>
+      this.request<SupportTicket>('POST', '/support/tickets', { category, message, attachment }),
     list: (filters?: { status?: SupportTicketStatus; assignedToMe?: boolean }) =>
       this.request<SupportTicket[]>('GET', '/support/tickets', undefined, {
         query: { status: filters?.status, assignedToMe: filters?.assignedToMe },
       }),
     getById: (id: string) => this.request<SupportTicket>('GET', `/support/tickets/${id}`),
-    addMessage: (id: string, message: string) =>
-      this.request<{ id: string }>('POST', `/support/tickets/${id}/messages`, { message }),
+    addMessage: (id: string, message: string, attachment?: SupportAttachmentInput) =>
+      this.request<{ id: string }>('POST', `/support/tickets/${id}/messages`, { message, attachment }),
     assign: (id: string, staffId: string) =>
       this.request<SupportTicket>('POST', `/support/tickets/${id}/assign`, { staffId }),
     escalate: (id: string, reason: string) =>
       this.request<SupportTicket>('POST', `/support/tickets/${id}/escalate`, { reason }),
     updateStatus: (id: string, status: SupportTicketStatus) =>
       this.request<SupportTicket>('POST', `/support/tickets/${id}/status`, { status }),
+  };
+
+  // ---------------------------------------------------------------------
+  // Agreements (global templates + per-loan)
+  // ---------------------------------------------------------------------
+  agreementTemplates = {
+    getActive: (key: AgreementTemplateKey) =>
+      this.request<AgreementTemplate>('GET', `/agreement-templates/${key}/active`),
+    listVersions: (key: AgreementTemplateKey) =>
+      this.request<AgreementTemplate[]>('GET', `/agreement-templates/${key}/versions`),
+    publish: (key: AgreementTemplateKey, dto: { title: string; content: string }) =>
+      this.request<AgreementTemplate>('POST', `/agreement-templates/${key}`, dto),
+  };
+
+  loanAgreements = {
+    update: (loanId: string, dto: { documentRef?: string; termsSnapshot?: Record<string, unknown> }) =>
+      this.request<Agreement>('PATCH', `/loans/${loanId}/agreement`, dto),
+    accept: (loanId: string) => this.request<Agreement>('POST', `/loans/${loanId}/agreement/accept`),
+  };
+
+  consents = {
+    list: () => this.request<{ id: string; consentType: string; version: string; givenAt: string }[]>('GET', '/consents/me'),
+    accept: (consentType: string, version: string) =>
+      this.request<{ id: string }>('POST', '/consents/accept', { consentType, version }),
   };
 
   // ---------------------------------------------------------------------

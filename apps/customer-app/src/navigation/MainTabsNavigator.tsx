@@ -23,7 +23,10 @@ const TABS: Record<keyof MainTabParamList, { icon: { active: IconName; inactive:
   Profile: { icon: { active: 'person', inactive: 'person-outline' }, label: 'Profile' },
 };
 
-/** Floating black capsule bar - the active tab expands into a white icon+label pill. */
+const ICON_SIZE = 22;
+const INACTIVE_TINT = 'rgba(255,255,255,0.5)';
+
+/** Floating black capsule bar - the active tab expands into a dark pill with icon+label. */
 function TabBarButton({
   focused,
   tab,
@@ -37,39 +40,43 @@ function TabBarButton({
   const pop = useRef(new Animated.Value(focused ? 1 : 0)).current;
 
   React.useEffect(() => {
-    Animated.spring(pop, { toValue: focused ? 1 : 0, useNativeDriver: false, speed: 18, bounciness: 8 }).start();
+    Animated.spring(pop, { toValue: focused ? 1 : 0, useNativeDriver: false, speed: 16, bounciness: 6 }).start();
   }, [focused, pop]);
 
   const onPressIn = () => Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, speed: 40 }).start();
   const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 8 }).start();
 
   return (
-    <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} style={styles.tabButton}>
-      <Animated.View
-        style={[
-          styles.pill,
-          {
-            paddingHorizontal: pop.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
-            opacity: pop,
-            transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }],
-          },
-        ]}
-      >
-        {focused ? (
-          <>
-            <Ionicons name={tab.icon.active} size={18} color={colors.ink} />
-            <Text style={styles.pillLabel} numberOfLines={1}>
-              {tab.label}
-            </Text>
-          </>
-        ) : null}
-      </Animated.View>
-      {!focused ? (
-        <Animated.View style={{ transform: [{ scale }] }}>
-          <Ionicons name={tab.icon.inactive} size={22} color="rgba(255,255,255,0.55)" />
+    <Animated.View style={{ flex: pop.interpolate({ inputRange: [0, 1], outputRange: [1, 2.3] }), height: '100%' }}>
+      <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} style={styles.tabButton}>
+        <Animated.View
+          style={[
+            styles.pill,
+            {
+              backgroundColor: colors.accentStart,
+              opacity: pop,
+              paddingHorizontal: pop.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
+              transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          {focused ? (
+            <>
+              <Ionicons name={tab.icon.active} size={ICON_SIZE} color={colors.textInverse} />
+              <Text style={styles.pillLabel} numberOfLines={1}>
+                {tab.label}
+              </Text>
+            </>
+          ) : null}
         </Animated.View>
-      ) : null}
-    </Pressable>
+        {!focused ? (
+          <Animated.View style={[styles.icon, { transform: [{ scale }] }]}>
+            <Ionicons name={tab.icon.inactive} size={ICON_SIZE} color={INACTIVE_TINT} />
+          </Animated.View>
+        ) : null}
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -113,7 +120,10 @@ export function MainTabsNavigator() {
   );
 }
 
-export const TAB_BAR_CLEARANCE = 96;
+const BAR_HEIGHT = 72;
+const PILL_HEIGHT = 48;
+
+export const TAB_BAR_CLEARANCE = BAR_HEIGHT + spacing.xl;
 
 const styles = StyleSheet.create({
   barWrap: {
@@ -125,23 +135,32 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-evenly',
     backgroundColor: colors.ink,
-    height: 64,
+    height: BAR_HEIGHT,
     width: '100%',
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     overflow: 'hidden',
     ...shadow.raised,
   },
-  tabButton: { minWidth: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
+  tabButton: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 40,
+    justifyContent: 'center',
+    alignSelf: 'center',
+    height: PILL_HEIGHT,
     borderRadius: radius.pill,
-    backgroundColor: '#FFFFFF',
     overflow: 'hidden',
   },
-  pillLabel: { ...typography.captionStrong, color: colors.ink, marginLeft: spacing.xs },
+  pillLabel: { ...typography.captionStrong, color: colors.textInverse, marginLeft: spacing.xs },
 });

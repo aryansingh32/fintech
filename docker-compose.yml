@@ -27,6 +27,8 @@ services:
     restart: always
     ports:
       - "3000:3000"
+    env_file:
+      - apps/backend/.env
     environment:
       DATABASE_URL: "postgresql://sptc:sptc_dev_password@postgres:5432/sptc_finance?schema=public"
       JWT_ACCESS_SECRET: "a8f9c2e1b4d7e3f6a9c2e5b8d1e4f7a0c3e6b9d2e5f8a1c4e7b0d3e6f9a2c5b8"

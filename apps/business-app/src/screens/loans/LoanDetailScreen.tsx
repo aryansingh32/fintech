@@ -8,8 +8,8 @@ import Decimal from 'decimal.js';
 import { colors, radius, spacing, typography } from '@/theme/theme';
 import { Card, ErrorState, LoadingState, PrimaryButton } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
-import { canManageCustomersAndLoans } from '@/rbac/uiPermissions';
-import { useDecideLoan, useLoan, useRescheduleInstallment } from '@/hooks/useApi';
+import { canManageAgreements, canManageCustomersAndLoans } from '@/rbac/uiPermissions';
+import { useDecideLoan, useLoan, useRescheduleInstallment, useUpdateLoanAgreement } from '@/hooks/useApi';
 import { formatDate, formatMoney } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
 import { ApiError, Installment } from '@sptc/shared';
@@ -20,10 +20,13 @@ export function LoanDetailScreen() {
   const { data: loan, isLoading, isError, error, refetch } = useLoan(route.params.loanId);
   const decideLoan = useDecideLoan(route.params.loanId);
   const rescheduleInstallment = useRescheduleInstallment(route.params.loanId);
+  const updateAgreement = useUpdateLoanAgreement(route.params.loanId);
   const { identity } = useAuth();
   const [declineReason, setDeclineReason] = useState('');
   const [showDeclineInput, setShowDeclineInput] = useState(false);
   const [reschedulingInstallment, setReschedulingInstallment] = useState<Installment | null>(null);
+  const [editingAgreement, setEditingAgreement] = useState(false);
+  const [agreementDraft, setAgreementDraft] = useState('');
 
   const summary = useMemo(() => {
     if (!loan) return null;
@@ -46,6 +49,28 @@ export function LoanDetailScreen() {
 
   const riskProfile = loan.riskScoreSnapshot;
   const canReschedule = identity ? canManageCustomersAndLoans(identity.role) : false;
+  const canEditAgreement = identity ? canManageAgreements(identity.role) : false;
+
+  const agreementContent =
+    typeof loan.agreement?.termsSnapshot?.agreementTemplateContent === 'string'
+      ? (loan.agreement.termsSnapshot.agreementTemplateContent as string)
+      : '';
+
+  const onStartEditAgreement = () => {
+    setAgreementDraft(agreementContent);
+    setEditingAgreement(true);
+  };
+
+  const onSaveAgreement = async () => {
+    try {
+      await updateAgreement.mutateAsync({
+        termsSnapshot: { ...(loan.agreement?.termsSnapshot ?? {}), agreementTemplateContent: agreementDraft },
+      });
+      setEditingAgreement(false);
+    } catch (err) {
+      Alert.alert('Could not update agreement', err instanceof ApiError ? err.message : 'Please try again.');
+    }
+  };
 
   const onApprove = () => {
     Alert.alert('Approve loan', `Approve ${loan.loanNumber} for ${formatMoney(loan.totalPayable)}?`, [
@@ -149,6 +174,47 @@ export function LoanDetailScreen() {
             onPress={() => navigation.navigate('CollectPayment', { loanId: loan.id, suggestedAmount: loan.installmentAmount })}
           />
         </View>
+      ) : null}
+
+      {loan.agreement ? (
+        <Card style={{ marginTop: spacing.lg }}>
+          <View style={styles.row}>
+            <Text style={styles.sectionTitleInline}>Agreement (v{loan.agreement.version})</Text>
+            {loan.agreement.acceptedByCustomerAt ? (
+              <View style={styles.statusPill}>
+                <Text style={styles.statusText}>Accepted by customer</Text>
+              </View>
+            ) : null}
+          </View>
+          {editingAgreement ? (
+            <>
+              <TextInput
+                value={agreementDraft}
+                onChangeText={setAgreementDraft}
+                multiline
+                numberOfLines={6}
+                style={[styles.input, { marginTop: spacing.sm, minHeight: 120, textAlignVertical: 'top' }]}
+              />
+              <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <PrimaryButton label="Cancel" onPress={() => setEditingAgreement(false)} variant="secondary" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <PrimaryButton label="Save" onPress={onSaveAgreement} loading={updateAgreement.isPending} />
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.caption}>{agreementContent || 'No wording published yet - using default terms.'}</Text>
+              {canEditAgreement && !loan.agreement.acceptedByCustomerAt ? (
+                <View style={{ marginTop: spacing.md }}>
+                  <PrimaryButton label="Edit for this loan" onPress={onStartEditAgreement} variant="secondary" />
+                </View>
+              ) : null}
+            </>
+          )}
+        </Card>
       ) : null}
 
       <Text style={styles.sectionTitle}>EMI Schedule</Text>

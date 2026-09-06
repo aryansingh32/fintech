@@ -34,6 +34,12 @@ export function StaffSupportListScreen() {
             <Text style={styles.caption}>
               {item.customer?.name} · {item.category} · {formatDate(item.updatedAt)}
             </Text>
+            {item.messages?.length ? (
+              <Text numberOfLines={1} style={styles.lastMessage}>
+                {item.messages[item.messages.length - 1].message ||
+                  (item.messages[item.messages.length - 1].attachments?.length ? '📷 Photo' : '')}
+              </Text>
+            ) : null}
           </Card>
         </Pressable>
       )}
@@ -48,6 +54,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   ticketNumber: { ...typography.bodyStrong, color: colors.textPrimary },
   caption: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  lastMessage: { ...typography.body, color: colors.textPrimary, marginTop: spacing.xs },
   statusPill: { backgroundColor: colors.brandSoft, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   statusEscalated: { backgroundColor: colors.statusOverdueSoft },
   statusText: { ...typography.captionStrong, color: colors.textPrimary },

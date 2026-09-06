@@ -64,7 +64,8 @@ export function SupportListScreen() {
                 <Text style={styles.caption}>{item.category} · {formatDate(item.updatedAt)}</Text>
                 {item.messages[item.messages.length - 1] ? (
                   <Text numberOfLines={1} style={styles.lastMessage}>
-                    {item.messages[item.messages.length - 1].message}
+                    {item.messages[item.messages.length - 1].message ||
+                      (item.messages[item.messages.length - 1].attachments?.length ? '📷 Photo' : '')}
                   </Text>
                 ) : null}
               </Card>

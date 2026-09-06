@@ -11,6 +11,7 @@ import { LoansTabScreen } from '@/screens/loans/LoansTabScreen';
 import { OverdueListScreen } from '@/screens/collections/OverdueListScreen';
 import { ReportsTabScreen } from '@/screens/reports/ReportsTabScreen';
 import { MoreScreen } from '@/screens/settings/MoreScreen';
+import { StaffSupportListScreen } from '@/screens/support/StaffSupportListScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -21,9 +22,13 @@ const TABS: Record<keyof MainTabParamList, { icon: { active: IconName; inactive:
   Customers: { icon: { active: 'people', inactive: 'people-outline' }, label: 'Customers' },
   Loans: { icon: { active: 'document-text', inactive: 'document-text-outline' }, label: 'Loans' },
   Collections: { icon: { active: 'cash', inactive: 'cash-outline' }, label: 'Collect' },
+  Support: { icon: { active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline' }, label: 'Support' },
   Reports: { icon: { active: 'bar-chart', inactive: 'bar-chart-outline' }, label: 'Reports' },
   More: { icon: { active: 'grid', inactive: 'grid-outline' }, label: 'More' },
 };
+
+const ICON_SIZE = 22;
+const INACTIVE_TINT = 'rgba(255,255,255,0.5)';
 
 /** Floating capsule tab bar - the active tab expands into an icon+label pill, matching the reference nav design. */
 function TabBarButton({
@@ -39,40 +44,43 @@ function TabBarButton({
   const pop = useRef(new Animated.Value(focused ? 1 : 0)).current;
 
   React.useEffect(() => {
-    Animated.spring(pop, { toValue: focused ? 1 : 0, useNativeDriver: false, speed: 18, bounciness: 8 }).start();
+    Animated.spring(pop, { toValue: focused ? 1 : 0, useNativeDriver: false, speed: 16, bounciness: 6 }).start();
   }, [focused, pop]);
 
   const onPressIn = () => Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, speed: 40 }).start();
   const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 8 }).start();
 
   return (
-    <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} style={styles.tabButton}>
-      <Animated.View
-        style={[
-          styles.pill,
-          {
-            backgroundColor: colors.accent,
-            paddingHorizontal: pop.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
-            opacity: pop,
-            transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }],
-          },
-        ]}
-      >
-        {focused ? (
-          <>
-            <Ionicons name={tab.icon.active} size={18} color={colors.accentText} />
-            <Text style={styles.pillLabel} numberOfLines={1}>
-              {tab.label}
-            </Text>
-          </>
-        ) : null}
-      </Animated.View>
-      {!focused ? (
-        <Animated.View style={{ transform: [{ scale }] }}>
-          <Ionicons name={tab.icon.inactive} size={22} color="rgba(255,255,255,0.55)" />
+    <Animated.View style={{ flex: pop.interpolate({ inputRange: [0, 1], outputRange: [1, 2.3] }), height: '100%' }}>
+      <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} style={styles.tabButton}>
+        <Animated.View
+          style={[
+            styles.pill,
+            {
+              backgroundColor: colors.accent,
+              opacity: pop,
+              paddingHorizontal: pop.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
+              transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          {focused ? (
+            <>
+              <Ionicons name={tab.icon.active} size={ICON_SIZE} color={colors.accentText} />
+              <Text style={styles.pillLabel} numberOfLines={1}>
+                {tab.label}
+              </Text>
+            </>
+          ) : null}
         </Animated.View>
-      ) : null}
-    </Pressable>
+        {!focused ? (
+          <Animated.View style={[styles.icon, { transform: [{ scale }] }]}>
+            <Ionicons name={tab.icon.inactive} size={ICON_SIZE} color={INACTIVE_TINT} />
+          </Animated.View>
+        ) : null}
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -111,13 +119,17 @@ export function MainTabsNavigator() {
       <Tab.Screen name="Customers" component={CustomerListScreen} />
       <Tab.Screen name="Loans" component={LoansTabScreen} />
       <Tab.Screen name="Collections" component={OverdueListScreen} options={{ title: 'Overdue Collections' }} />
+      <Tab.Screen name="Support" component={StaffSupportListScreen} options={{ title: 'Support' }} />
       <Tab.Screen name="Reports" component={ReportsTabScreen} />
       <Tab.Screen name="More" component={MoreScreen} />
     </Tab.Navigator>
   );
 }
 
-export const TAB_BAR_CLEARANCE = 96;
+const BAR_HEIGHT = 72;
+const PILL_HEIGHT = 48;
+
+export const TAB_BAR_CLEARANCE = BAR_HEIGHT + spacing.xl;
 
 const styles = StyleSheet.create({
   barWrap: {
@@ -129,20 +141,30 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-evenly',
     backgroundColor: colors.ink,
-    height: 64,
+    height: BAR_HEIGHT,
     width: '100%',
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     overflow: 'hidden',
     ...shadow.raised,
   },
-  tabButton: { minWidth: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
+  tabButton: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 40,
+    justifyContent: 'center',
+    alignSelf: 'center',
+    height: PILL_HEIGHT,
     borderRadius: radius.pill,
     overflow: 'hidden',
   },

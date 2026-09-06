@@ -19,6 +19,8 @@ export enum NotificationEvent {
   SECURITY_ALERT = 'SECURITY_ALERT',
   PAYMENT_REVERSED = 'PAYMENT_REVERSED',
   EMI_RESCHEDULED = 'EMI_RESCHEDULED',
+  KYC_VERIFIED = 'KYC_VERIFIED',
+  KYC_REJECTED = 'KYC_REJECTED',
 }
 
 export type SupportedLocale = 'en' | 'hi';
@@ -113,6 +115,20 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationEvent, NotificationTempl
     body: {
       en: 'Your EMI for {{loanNumber}} has been moved to {{dueDate}}.',
       hi: '{{loanNumber}} की आपकी EMI {{dueDate}} पर स्थानांतरित कर दी गई है।',
+    },
+  },
+  [NotificationEvent.KYC_VERIFIED]: {
+    title: { en: 'KYC verified', hi: 'KYC सत्यापित' },
+    body: {
+      en: 'Your {{documentType}} has been verified. Your KYC is now complete.',
+      hi: 'आपका {{documentType}} सत्यापित हो गया है। आपका KYC अब पूर्ण है।',
+    },
+  },
+  [NotificationEvent.KYC_REJECTED]: {
+    title: { en: 'KYC document rejected', hi: 'KYC दस्तावेज़ अस्वीकृत' },
+    body: {
+      en: 'Your {{documentType}} could not be verified: {{reason}}. Please visit your SPTC Finance store.',
+      hi: 'आपका {{documentType}} सत्यापित नहीं हो सका: {{reason}}। कृपया अपने SPTC Finance स्टोर पर जाएं।',
     },
   },
 };

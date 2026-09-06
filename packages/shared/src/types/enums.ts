@@ -140,3 +140,8 @@ export enum NotificationStatus {
   DELIVERED = 'DELIVERED',
   FAILED = 'FAILED',
 }
+
+export enum AgreementTemplateKey {
+  TERMS_OF_SERVICE = 'TERMS_OF_SERVICE',
+  LOAN_AGREEMENT_DEFAULT = 'LOAN_AGREEMENT_DEFAULT',
+}

@@ -19,3 +19,8 @@ ios/build/
 .expo-shared/
 prisma/dev.db
 prisma/dev.db-journal
+
+# Firebase service account keys - never commit these (contain a private key).
+# google-services.json files ARE safe to commit (public app config only).
+*firebase-adminsdk*.json
+*service-account*.json

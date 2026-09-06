@@ -5,5 +5,6 @@ export function useMyProfile() {
   return useQuery({
     queryKey: ['profile', 'me'],
     queryFn: () => apiClient.myProfile.get(),
+    refetchInterval: 20_000,
   });
 }

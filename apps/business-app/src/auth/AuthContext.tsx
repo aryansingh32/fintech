@@ -18,6 +18,7 @@ interface AuthContextValue {
   pendingMobile: string | null;
   login: (mobile: string, password: string) => Promise<{ devOtp?: string }>;
   verifyDevice: (mobile: string, otp: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -92,6 +93,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isGlobal: Boolean(decoded?.isGlobal),
         });
         setPendingMobile(null);
+        setStatus('authenticated');
+      },
+      loginWithGoogle: async (idToken: string) => {
+        const device = await getDeviceInfo();
+        const res = await apiClient.staffAuth.googleLogin(idToken, device);
+        if (res.status === 'DEVICE_VERIFICATION_REQUIRED') {
+          throw new Error('Additional verification is required for this account. Please sign in with your password instead.');
+        }
+        await persistTokens(res.accessToken, res.refreshToken);
+        const decoded = decodeAccessTokenForDisplay(res.accessToken);
+        setIdentity({
+          staffUserId: res.staffUserId,
+          role: decoded?.role ?? StaffRole.SHOPKEEPER,
+          branchId: decoded?.branchId ?? null,
+          isGlobal: Boolean(decoded?.isGlobal),
+        });
         setStatus('authenticated');
       },
       logout: async () => {

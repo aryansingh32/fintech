@@ -139,6 +139,10 @@ export function CustomerProfileScreen() {
               </View>
             </View>
             <Text style={styles.caption}>{record.maskedIdentifier}</Text>
+            {record.documentRef && /\.(png|jpe?g|webp|heic)$/i.test(record.documentRef) ? (
+              <Image source={{ uri: record.documentRef }} style={styles.kycDocImage} resizeMode="cover" />
+            ) : null}
+            {record.rejectionReason ? <Text style={styles.rejectionCaption}>{record.rejectionReason}</Text> : null}
             {canManage && record.status === 'SUBMITTED' ? (
               <View style={styles.verifyRow}>
                 <PrimaryButton label="Verify" onPress={() => onVerify(record.id, 'VERIFIED')} size="md" />
@@ -370,6 +374,8 @@ const styles = StyleSheet.create({
   },
   name: { ...typography.h2, color: colors.textPrimary },
   caption: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  kycDocImage: { width: '100%', height: 160, borderRadius: radius.md, marginTop: spacing.sm, backgroundColor: colors.surfaceMuted },
+  rejectionCaption: { ...typography.caption, color: colors.statusOverdue, marginTop: spacing.xs },
   body: { ...typography.body, color: colors.textPrimary },
   kycRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md },
   badge: { backgroundColor: colors.brandSoft, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },

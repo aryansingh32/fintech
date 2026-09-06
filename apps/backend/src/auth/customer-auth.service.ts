@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { AuditActorType, OtpPurpose, SubjectType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,6 +7,7 @@ import { OtpService } from './otp.service';
 import { SessionService, IssuedTokens } from './session.service';
 import { DeviceInfoDto } from './dto/device-info.dto';
 import { generateCustomerCode, retryOnConflict } from '../common/id-generators';
+import { FirebaseAdminService } from '../firebase/firebase-admin.service';
 
 @Injectable()
 export class CustomerAuthService {
@@ -15,7 +16,64 @@ export class CustomerAuthService {
     private readonly otp: OtpService,
     private readonly sessions: SessionService,
     private readonly audit: AuditService,
+    private readonly firebase: FirebaseAdminService,
   ) {}
+
+  /**
+   * Google Sign-In only logs in a customer whose account ALREADY carries the
+   * verified Google email - it is an additional login method for an existing
+   * account, never a self-signup path. Customer.mobile is required and
+   * unique in this schema, so there's no safe way to create a brand-new
+   * customer from an email-only identity; a genuinely new person still needs
+   * a store visit / OTP signup to get a mobile-linked account first.
+   */
+  async googleLogin(
+    idToken: string,
+    device: DeviceInfoDto,
+    ipAddress?: string,
+  ): Promise<IssuedTokens & { customerId: string }> {
+    const auth = this.firebase.getAuth();
+    if (!auth) throw new ServiceUnavailableException('Google Sign-In is not configured.');
+
+    let email: string | undefined;
+    try {
+      const decoded = await auth.verifyIdToken(idToken);
+      email = decoded.email_verified ? decoded.email : undefined;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired Google sign-in token.');
+    }
+    if (!email) throw new UnauthorizedException('Your Google account has no verified email.');
+
+    const customer = await this.prisma.customer.findFirst({ where: { email, isActive: true } });
+    if (!customer) {
+      throw new UnauthorizedException(
+        'No SPTC Finance account is linked to this Google email yet. Sign in with your mobile number, or ask your store to add this email to your profile.',
+      );
+    }
+
+    const deviceRow = await this.sessions.upsertDevice(
+      { subjectType: SubjectType.CUSTOMER, customerId: customer.id },
+      device,
+      true,
+    );
+    const tokens = await this.sessions.issueSession(
+      { subjectType: SubjectType.CUSTOMER, customerId: customer.id },
+      deviceRow.id,
+      ipAddress,
+    );
+
+    await this.audit.record({
+      actorType: AuditActorType.CUSTOMER,
+      actorId: customer.id,
+      action: 'CUSTOMER_GOOGLE_LOGIN',
+      entityType: 'Customer',
+      entityId: customer.id,
+      ipAddress,
+      deviceId: deviceRow.id,
+    });
+
+    return { ...tokens, customerId: customer.id };
+  }
 
   async requestOtp(mobile: string, ipAddress?: string) {
     const result = await this.otp.requestOtp(mobile, OtpPurpose.CUSTOMER_LOGIN, { ipAddress });

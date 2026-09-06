@@ -73,7 +73,7 @@ export class SupportController {
   @Post(':id/messages')
   async addMessage(@Param('id') id: string, @Body() dto: AddMessageDto, @CurrentUser() user: AuthUser) {
     await this.assertStaffCanReply(user);
-    return this.support.addMessage(id, user, dto.message);
+    return this.support.addMessage(id, user, dto.message ?? '', dto.attachment);
   }
 
   @RequireSubject(SubjectType.STAFF)

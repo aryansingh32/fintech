@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -19,6 +20,20 @@ export class CreateLoanProductDto {
   @IsOptional()
   @IsString()
   description?: string;
+}
+
+export class UpdateLoanProductDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export class FeeRuleDto {
@@ -81,4 +96,16 @@ export class CreateLoanProductVersionDto {
 
   @IsObject()
   reversalRules: Record<string, unknown>;
+}
+
+/**
+ * Versions are immutable once created (existing loans reference a specific
+ * version and never re-read it live), so this only allows toggling isActive -
+ * that's the safe "edit" of a version: stop offering it for new loans without
+ * touching its frozen terms. To change actual terms, create a new version.
+ */
+export class UpdateLoanProductVersionDto {
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

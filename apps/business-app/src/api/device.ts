@@ -14,8 +14,14 @@ async function getOrCreateDeviceIdentifier(): Promise<string> {
   return generated;
 }
 
-/** See customer-app's device.ts for the fail-soft rationale - a missing token just means no push for this device. */
-async function getExpoPushToken(): Promise<string | undefined> {
+/**
+ * Fetches this device's native push token - on Android this IS the FCM
+ * registration token (backed by the "sptc-finance-platform" Firebase project
+ * via google-services.json), sent directly to the backend's FCM provider.
+ * See customer-app's device.ts for the fail-soft rationale - a missing token
+ * just means no push for this device.
+ */
+async function getNativePushToken(): Promise<string | undefined> {
   if (!Device.isDevice) return undefined;
   try {
     const existing = await Notifications.getPermissionsAsync();
@@ -33,7 +39,7 @@ async function getExpoPushToken(): Promise<string | undefined> {
       });
     }
 
-    const token = await Notifications.getExpoPushTokenAsync();
+    const token = await Notifications.getDevicePushTokenAsync();
     return token.data;
   } catch {
     return undefined;
@@ -42,7 +48,7 @@ async function getExpoPushToken(): Promise<string | undefined> {
 
 export async function getDeviceInfo(): Promise<DeviceInfo> {
   const deviceIdentifier = await getOrCreateDeviceIdentifier();
-  const pushToken = await getExpoPushToken();
+  const pushToken = await getNativePushToken();
   return {
     deviceIdentifier,
     platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',

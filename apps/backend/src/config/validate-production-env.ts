@@ -34,6 +34,12 @@ export function validateProductionEnv(env: NodeJS.ProcessEnv): void {
   if (env.SMS_PROVIDER && env.SMS_PROVIDER !== 'twilio') {
     problems.push(`Unsupported SMS_PROVIDER "${env.SMS_PROVIDER}" - only "twilio" is implemented.`);
   }
+  if (env.PUSH_PROVIDER && !['expo', 'fcm'].includes(env.PUSH_PROVIDER)) {
+    problems.push(`Unsupported PUSH_PROVIDER "${env.PUSH_PROVIDER}" - only "expo" and "fcm" are implemented.`);
+  }
+  if (env.PUSH_PROVIDER === 'fcm' && !env.FIREBASE_SERVICE_ACCOUNT_JSON && !env.GOOGLE_APPLICATION_CREDENTIALS) {
+    problems.push('PUSH_PROVIDER=fcm requires FIREBASE_SERVICE_ACCOUNT_JSON (or GOOGLE_APPLICATION_CREDENTIALS) to be set.');
+  }
   if (env.PAYMENT_GATEWAY_PROVIDER && env.PAYMENT_GATEWAY_PROVIDER !== 'razorpay') {
     problems.push(
       `Unsupported PAYMENT_GATEWAY_PROVIDER "${env.PAYMENT_GATEWAY_PROVIDER}" - only "razorpay" is implemented.`,

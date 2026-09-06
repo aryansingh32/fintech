@@ -80,6 +80,8 @@ model StaffUser {
   approvedReversals         Reversal[]             @relation("ReversalApprovedBy")
   adjustments               Adjustment[]           @relation("AdjustmentStaff")
   approvedAdjustments       Adjustment[]           @relation("AdjustmentApprovedBy")
+  createdAgreementTemplates AgreementTemplate[]
+  updatedAgreements         Agreement[]            @relation("AgreementUpdatedBy")
 
   @@index([branchId])
   @@index([role])
@@ -517,16 +519,50 @@ model Installment {
 // AGREEMENTS
 // ============================================================================
 
+// Global, versioned template text for a given agreement purpose (e.g. the
+// default loan agreement wording, or the app's general Terms of Service).
+// Business App staff (AGREEMENT_MANAGE) publish a new version; the previous
+// one is deactivated but never deleted, matching the LoanProductVersion
+// immutable-history pattern elsewhere in this schema.
+enum AgreementTemplateKey {
+  TERMS_OF_SERVICE
+  LOAN_AGREEMENT_DEFAULT
+}
+
+model AgreementTemplate {
+  id               String               @id @default(uuid())
+  key              AgreementTemplateKey
+  version          Int
+  title            String
+  content          String // markdown/plain text body shown to the customer
+  isActive         Boolean              @default(true)
+  createdByStaffId String
+  createdByStaff   StaffUser            @relation(fields: [createdByStaffId], references: [id])
+  createdAt        DateTime             @default(now())
+
+  @@unique([key, version])
+  @@index([key, isActive])
+}
+
+// Per-loan agreement. termsSnapshot is frozen from the current
+// LOAN_AGREEMENT_DEFAULT template + the loan's own terms at approval time,
+// but - unlike a LoanProductVersion - staff CAN still override its content
+// for one specific loan (a manually negotiated clause, a correction) via
+// updatedByStaffId/updatedAt, right up until the customer accepts it;
+// acceptedByCustomerAt being non-null freezes it permanently.
 model Agreement {
-  id                   String    @id @default(uuid())
-  loanId               String    @unique
-  loan                 Loan      @relation(fields: [loanId], references: [id])
-  version              Int       @default(1)
+  id                   String     @id @default(uuid())
+  loanId               String     @unique
+  loan                 Loan       @relation(fields: [loanId], references: [id])
+  version              Int        @default(1)
   termsSnapshot        Json // full frozen copy of loan terms + EMI schedule at approval time
   documentRef          String? // pointer to generated PDF
+  updatedByStaffId     String?
+  updatedByStaff       StaffUser? @relation("AgreementUpdatedBy", fields: [updatedByStaffId], references: [id])
+  updatedAt            DateTime?
   acceptedByCustomerAt DateTime?
   acceptedIp           String?
-  createdAt            DateTime  @default(now())
+  createdAt            DateTime   @default(now())
 
   @@index([loanId])
 }

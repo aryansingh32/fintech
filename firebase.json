@@ -1,0 +1,11 @@
+{
+  "auth": {
+    "authorizedDomains": ["localhost"],
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "SPTC Finance",
+        "supportEmail": "dev.itsaryan@gmail.com"
+      }
+    }
+  }
+}

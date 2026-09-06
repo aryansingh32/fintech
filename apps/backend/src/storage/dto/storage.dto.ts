@@ -4,6 +4,7 @@ export enum UploadPurpose {
   CUSTOMER_PHOTO = 'customer-photo',
   REFERENCE_PHOTO = 'reference-photo',
   KYC_DOCUMENT = 'kyc-document',
+  SUPPORT_ATTACHMENT = 'support-attachment',
 }
 
 export class PresignUploadDto {
