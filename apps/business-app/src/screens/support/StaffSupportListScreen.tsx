@@ -28,7 +28,9 @@ export function StaffSupportListScreen() {
             <View style={styles.row}>
               <Text style={styles.ticketNumber}>{item.ticketNumber}</Text>
               <View style={[styles.statusPill, item.status === 'ESCALATED' && styles.statusEscalated]}>
-                <Text style={styles.statusText}>{item.status.replace('_', ' ')}</Text>
+                <Text style={styles.statusText}>
+                  {!item.chatApprovedAt ? 'AWAITING APPROVAL' : item.status.replace('_', ' ')}
+                </Text>
               </View>
             </View>
             <Text style={styles.caption}>

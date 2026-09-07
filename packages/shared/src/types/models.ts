@@ -188,6 +188,7 @@ export interface LoanProductVersion {
   versionNumber: number;
   interestType: 'FLAT' | 'REDUCING' | 'ZERO_COST';
   interestRateAnnual?: string | null;
+  interestBasis?: 'FINANCED_PRINCIPAL' | 'TOTAL_CASH_PRICE';
   minInstallments: number;
   maxInstallments: number;
   installmentFrequency: InstallmentFrequency;
@@ -350,10 +351,27 @@ export interface SupportTicket {
   category: SupportCategory;
   status: SupportTicketStatus;
   assignedStaffId?: string | null;
+  chatApprovedAt?: IsoDateString | null;
   createdAt: IsoDateString;
   updatedAt: IsoDateString;
   messages: SupportMessage[];
   customer?: Customer;
+}
+
+export interface StaffAccount {
+  id: string;
+  name: string;
+  mobile: string;
+  email?: string | null;
+  role: StaffRole;
+  isActive: boolean;
+  isApproved: boolean;
+  isGlobal: boolean;
+  branchId?: string | null;
+  approvedByStaffId?: string | null;
+  approvedAt?: IsoDateString | null;
+  createdAt: IsoDateString;
+  lastLoginAt?: IsoDateString | null;
 }
 
 export interface AppNotification {

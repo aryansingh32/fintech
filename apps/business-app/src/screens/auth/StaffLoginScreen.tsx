@@ -3,6 +3,7 @@ import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, typography } from '@/theme/theme';
 import { Screen, Card, PrimaryButton } from '@/components/ui';
+import { useOtpBanner } from '@/components/OtpIslandBanner';
 import { useAuth } from '@/auth/AuthContext';
 import { signInWithGoogle } from '@/auth/googleAuth';
 import { AuthStackParamList } from '@/navigation/types';
@@ -12,6 +13,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'StaffLogin'>;
 
 export function StaffLoginScreen({ navigation }: Props) {
   const { login, loginWithGoogle } = useAuth();
+  const { showOtp } = useOtpBanner();
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,7 +25,7 @@ export function StaffLoginScreen({ navigation }: Props) {
       const { devOtp } = await login(mobile.trim(), password);
       if (devOtp) {
         navigation.navigate('DeviceVerify', { mobile: mobile.trim() });
-        Alert.alert('Dev mode', `Verification code: ${devOtp}`);
+        showOtp(devOtp);
       }
       // If no devOtp/step-up was needed, AuthContext already flipped to 'authenticated' and RootNavigator re-renders.
     } catch (err) {

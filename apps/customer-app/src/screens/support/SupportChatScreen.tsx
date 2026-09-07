@@ -78,27 +78,39 @@ export function SupportChatScreen() {
         }}
       />
 
-      <View style={styles.inputRow}>
-        <Pressable onPress={onAttach} style={styles.attachButton} disabled={uploadAttachment.isPending}>
-          <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
-        </Pressable>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          placeholder="Type a message..."
-          placeholderTextColor={colors.textSecondary}
-          style={styles.input}
-          multiline
-        />
-        <View style={{ width: 90 }}>
-          <PrimaryButton
-            label="Send"
-            onPress={onSend}
-            loading={addMessage.isPending || uploadAttachment.isPending}
-            disabled={!text.trim()}
-          />
+      {ticket.status === 'CLOSED' || ticket.status === 'RESOLVED' ? (
+        <View style={styles.pendingBanner}>
+          <Text style={styles.pendingBannerText}>This conversation has been closed.</Text>
         </View>
-      </View>
+      ) : !ticket.chatApprovedAt ? (
+        <View style={styles.pendingBanner}>
+          <Text style={styles.pendingBannerText}>
+            Your ticket has been submitted. Our team will review it and open the chat shortly.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.inputRow}>
+          <Pressable onPress={onAttach} style={styles.attachButton} disabled={uploadAttachment.isPending}>
+            <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
+          </Pressable>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Type a message..."
+            placeholderTextColor={colors.textSecondary}
+            style={styles.input}
+            multiline
+          />
+          <View style={{ width: 90 }}>
+            <PrimaryButton
+              label="Send"
+              onPress={onSend}
+              loading={addMessage.isPending || uploadAttachment.isPending}
+              disabled={!text.trim()}
+            />
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -128,6 +140,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   attachButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  pendingBanner: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
+  pendingBannerText: { ...typography.caption, color: colors.textSecondary, textAlign: 'center' },
   input: {
     flex: 1,
     borderWidth: 1,

@@ -41,6 +41,8 @@ model Branch {
 }
 
 enum StaffRole {
+  SUPER_ADMIN
+  ADMIN
   OWNER
   MANAGER
   SHOPKEEPER
@@ -61,6 +63,13 @@ model StaffUser {
   role         StaffRole
   isActive     Boolean   @default(true)
   isGlobal     Boolean   @default(false) // OWNER-level staff not restricted to a single branch
+  // New staff accounts created via the staff-management API start unapproved
+  // and cannot log in until a SUPER_ADMIN approves them. Defaults to true so
+  // pre-existing/seeded accounts are never accidentally locked out.
+  isApproved       Boolean    @default(true)
+  approvedByStaffId String?
+  approvedByStaff   StaffUser? @relation("StaffApprovedBy", fields: [approvedByStaffId], references: [id])
+  approvedAt        DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   lastLoginAt  DateTime?
@@ -82,6 +91,7 @@ model StaffUser {
   approvedAdjustments       Adjustment[]           @relation("AdjustmentApprovedBy")
   createdAgreementTemplates AgreementTemplate[]
   updatedAgreements         Agreement[]            @relation("AgreementUpdatedBy")
+  approvedStaff             StaffUser[]            @relation("StaffApprovedBy")
 
   @@index([branchId])
   @@index([role])
@@ -388,6 +398,12 @@ model LoanProductVersion {
   versionNumber        Int
   interestType         String // FLAT | REDUCING | ZERO_COST
   interestRateAnnual   Decimal?             @db.Decimal(6, 3)
+  // Which amount the rate above is applied to for FLAT/REDUCING interest:
+  // FINANCED_PRINCIPAL = cash price minus down payment (the amount actually
+  // lent - the historical/default behavior); TOTAL_CASH_PRICE = the full
+  // product value including the down payment. Staff can also bypass this
+  // entirely per-loan via CreateLoanDto.manualInterestAmount.
+  interestBasis        String               @default("FINANCED_PRINCIPAL") // FINANCED_PRINCIPAL | TOTAL_CASH_PRICE
   minInstallments      Int
   maxInstallments      Int
   installmentFrequency InstallmentFrequency @default(MONTHLY)
@@ -527,6 +543,7 @@ model Installment {
 enum AgreementTemplateKey {
   TERMS_OF_SERVICE
   LOAN_AGREEMENT_DEFAULT
+  PRIVACY_POLICY
 }
 
 model AgreementTemplate {
@@ -820,6 +837,10 @@ model SupportTicket {
   status          SupportTicketStatus @default(OPEN)
   assignedStaffId String?
   assignedStaff   StaffUser?          @relation(fields: [assignedStaffId], references: [id])
+  // Null until a staff member reviews the raised ticket and opens the chat.
+  // Customers cannot send further messages before this is set (the initial
+  // problem description submitted with the ticket is always allowed).
+  chatApprovedAt  DateTime?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 

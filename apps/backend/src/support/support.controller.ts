@@ -78,6 +78,13 @@ export class SupportController {
 
   @RequireSubject(SubjectType.STAFF)
   @RequirePermissions(Permission.SUPPORT_REPLY)
+  @Post(':id/approve')
+  approve(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.support.approve(id, user);
+  }
+
+  @RequireSubject(SubjectType.STAFF)
+  @RequirePermissions(Permission.SUPPORT_REPLY)
   @Post(':id/assign')
   assign(@Param('id') id: string, @Body() dto: AssignTicketDto, @CurrentUser() user: AuthUser) {
     return this.support.assign(id, dto.staffId, user);

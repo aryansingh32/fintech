@@ -46,7 +46,7 @@ export function SupportListScreen() {
       ) : isError ? (
         <ErrorState message={error instanceof Error ? error.message : 'Please try again.'} onRetry={refetch} />
       ) : !tickets?.length ? (
-        <EmptyState title="No support tickets" subtitle="Need help? Start a new conversation below." />
+        <EmptyState title="No support tickets" subtitle="Need help? Raise a ticket below and our team will get back to you." />
       ) : (
         <FlatList
           contentContainerStyle={styles.content}
@@ -58,7 +58,9 @@ export function SupportListScreen() {
                 <View style={styles.row}>
                   <Text style={styles.ticketNumber}>{item.ticketNumber}</Text>
                   <View style={styles.statusPill}>
-                    <Text style={styles.statusText}>{item.status.replace('_', ' ')}</Text>
+                    <Text style={styles.statusText}>
+                      {!item.chatApprovedAt ? 'Awaiting approval' : item.status.replace('_', ' ')}
+                    </Text>
                   </View>
                 </View>
                 <Text style={styles.caption}>{item.category} · {formatDate(item.updatedAt)}</Text>
@@ -75,13 +77,13 @@ export function SupportListScreen() {
       )}
 
       <View style={styles.fabWrap}>
-        <PrimaryButton label="New Ticket" onPress={() => setModalVisible(true)} />
+        <PrimaryButton label="Raise a Ticket" onPress={() => setModalVisible(true)} />
       </View>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>New Support Ticket</Text>
+            <Text style={styles.modalTitle}>Raise a Support Ticket</Text>
 
             <Text style={styles.caption}>Category</Text>
             <View style={styles.categoryRow}>

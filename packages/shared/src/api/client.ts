@@ -4,6 +4,7 @@ import {
   AllocationComponent,
   LoanStatus,
   PaymentMethod,
+  StaffRole,
   SupportCategory,
   SupportTicketStatus,
 } from '../types/enums';
@@ -30,6 +31,7 @@ import {
   ProductIdentifier,
   Receipt,
   RepaymentProfile,
+  StaffAccount,
   SupportTicket,
 } from '../types/models';
 
@@ -373,6 +375,7 @@ export class ApiClient {
       pendingUdhaarAmount?: number;
       numberOfInstallments: number;
       startDate?: string;
+      manualInterestAmount?: number;
     }) => this.request<Loan>('POST', '/loans', dto),
     preview: (dto: {
       loanProductVersionId: string;
@@ -380,6 +383,7 @@ export class ApiClient {
       downPaymentAmount: number;
       numberOfInstallments: number;
       startDate?: string;
+      manualInterestAmount?: number;
     }) => this.request<LoanSchedulePreview>('POST', '/loans/preview', dto),
     list: (filters?: { status?: LoanStatus; customerId?: string }) =>
       this.request<Loan[]>('GET', '/loans', undefined, { query: filters }),
@@ -498,6 +502,7 @@ export class ApiClient {
     getById: (id: string) => this.request<SupportTicket>('GET', `/support/tickets/${id}`),
     addMessage: (id: string, message: string, attachment?: SupportAttachmentInput) =>
       this.request<{ id: string }>('POST', `/support/tickets/${id}/messages`, { message, attachment }),
+    approve: (id: string) => this.request<SupportTicket>('POST', `/support/tickets/${id}/approve`, {}),
     assign: (id: string, staffId: string) =>
       this.request<SupportTicket>('POST', `/support/tickets/${id}/assign`, { staffId }),
     escalate: (id: string, reason: string) =>
@@ -528,6 +533,17 @@ export class ApiClient {
     list: () => this.request<{ id: string; consentType: string; version: string; givenAt: string }[]>('GET', '/consents/me'),
     accept: (consentType: string, version: string) =>
       this.request<{ id: string }>('POST', '/consents/accept', { consentType, version }),
+  };
+
+  // ---------------------------------------------------------------------
+  // Staff management (Business App only, SUPER_ADMIN)
+  // ---------------------------------------------------------------------
+  staff = {
+    list: () => this.request<StaffAccount[]>('GET', '/staff'),
+    create: (dto: { name: string; mobile: string; email?: string; password: string; role: StaffRole; branchId?: string }) =>
+      this.request<StaffAccount>('POST', '/staff', dto),
+    approve: (id: string) => this.request<StaffAccount>('POST', `/staff/${id}/approve`, {}),
+    reject: (id: string, reason?: string) => this.request<StaffAccount>('POST', `/staff/${id}/reject`, { reason }),
   };
 
   // ---------------------------------------------------------------------

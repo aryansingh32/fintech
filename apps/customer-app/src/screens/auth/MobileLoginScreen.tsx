@@ -3,6 +3,7 @@ import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, typography } from '@/theme/theme';
 import { Screen, Card, PrimaryButton, LiquidMark } from '@/components/ui';
+import { useOtpBanner } from '@/components/OtpIslandBanner';
 import { useAuth } from '@/auth/AuthContext';
 import { signInWithGoogle } from '@/auth/googleAuth';
 import { AuthStackParamList } from '@/navigation/types';
@@ -12,6 +13,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'MobileLogin'>;
 
 export function MobileLoginScreen({ navigation }: Props) {
   const { requestOtp, loginWithGoogle } = useAuth();
+  const { showOtp } = useOtpBanner();
   const [mobile, setMobile] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -23,8 +25,9 @@ export function MobileLoginScreen({ navigation }: Props) {
     }
     setLoading(true);
     try {
-      await requestOtp(mobile.trim());
+      const { devOtp } = await requestOtp(mobile.trim());
       navigation.navigate('OtpVerify', { mobile: mobile.trim() });
+      if (devOtp) showOtp(devOtp);
     } catch (err) {
       Alert.alert('Could not send code', err instanceof ApiError ? err.message : 'Please try again.');
     } finally {

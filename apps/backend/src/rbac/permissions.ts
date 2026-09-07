@@ -54,6 +54,11 @@ export enum Permission {
  * individual keys on top of this without inventing a new role.
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
+  // Sole role allowed to create/approve/reject other staff accounts (see StaffModule).
+  [StaffRole.SUPER_ADMIN]: Object.values(Permission),
+  // Full application access, same as OWNER, except staff management - only
+  // the SUPER_ADMIN who approved them can manage other staff accounts.
+  [StaffRole.ADMIN]: Object.values(Permission).filter((p) => p !== Permission.STAFF_MANAGE),
   [StaffRole.OWNER]: Object.values(Permission),
   [StaffRole.MANAGER]: [
     Permission.CUSTOMER_CREATE,

@@ -115,6 +115,7 @@ export class LoanProductsService {
         versionNumber: nextVersion,
         interestType: dto.interestType,
         interestRateAnnual: dto.interestRateAnnual,
+        interestBasis: dto.interestBasis ?? 'FINANCED_PRINCIPAL',
         minInstallments: dto.minInstallments,
         maxInstallments: dto.maxInstallments,
         installmentFrequency: dto.installmentFrequency,

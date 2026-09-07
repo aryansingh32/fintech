@@ -30,6 +30,7 @@ export type RootStackParamList = {
   SupportChat: { ticketId: string };
   LoanProductsAdmin: undefined;
   AgreementTemplatesAdmin: undefined;
+  StaffManagement: undefined;
   Profile: undefined;
   SecurityDevices: undefined;
 };

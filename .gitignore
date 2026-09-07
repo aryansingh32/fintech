@@ -24,3 +24,4 @@ prisma/dev.db-journal
 # google-services.json files ARE safe to commit (public app config only).
 *firebase-adminsdk*.json
 *service-account*.json
+.wrangler/

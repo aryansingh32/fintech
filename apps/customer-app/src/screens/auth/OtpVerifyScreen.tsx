@@ -3,6 +3,7 @@ import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, typography } from '@/theme/theme';
 import { Screen, Card, PrimaryButton } from '@/components/ui';
+import { useOtpBanner } from '@/components/OtpIslandBanner';
 import { useAuth } from '@/auth/AuthContext';
 import { AuthStackParamList } from '@/navigation/types';
 import { ApiError } from '@sptc/shared';
@@ -12,6 +13,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'OtpVerify'>;
 export function OtpVerifyScreen({ route }: Props) {
   const { mobile } = route.params;
   const { verifyOtp, requestOtp } = useAuth();
+  const { showOtp } = useOtpBanner();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -32,7 +34,7 @@ export function OtpVerifyScreen({ route }: Props) {
     setResending(true);
     try {
       const { devOtp } = await requestOtp(mobile);
-      if (devOtp) Alert.alert('Dev mode', `New code: ${devOtp}`);
+      if (devOtp) showOtp(devOtp);
     } catch (err) {
       Alert.alert('Could not resend code', err instanceof ApiError ? err.message : 'Please try again.');
     } finally {

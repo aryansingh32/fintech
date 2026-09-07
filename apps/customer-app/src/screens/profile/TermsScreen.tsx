@@ -9,6 +9,9 @@ export function TermsScreen() {
   const { data: template, isLoading, isError, error, refetch } = useActiveAgreementTemplate(
     AgreementTemplateKey.TERMS_OF_SERVICE,
   );
+  const { data: privacyPolicy, isLoading: privacyLoading } = useActiveAgreementTemplate(
+    AgreementTemplateKey.PRIVACY_POLICY,
+  );
   const { data: consents } = useMyConsents();
   const acceptConsent = useAcceptConsent();
 
@@ -53,6 +56,14 @@ export function TermsScreen() {
           The specific agreement for each loan - including its EMI schedule and charges - is available from that
           loan&apos;s detail screen for you to review and accept.
         </Text>
+      </Card>
+      <Card style={{ marginTop: spacing.lg }}>
+        <Text style={styles.h2}>{privacyPolicy?.title ?? 'Privacy Policy'}</Text>
+        {privacyLoading ? (
+          <Text style={styles.body}>Loading...</Text>
+        ) : (
+          <Text style={styles.body}>{privacyPolicy?.content ?? 'Privacy policy is not published yet.'}</Text>
+        )}
       </Card>
     </ScrollView>
   );

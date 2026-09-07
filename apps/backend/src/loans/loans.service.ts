@@ -58,6 +58,8 @@ export class LoansService {
       installmentFrequency: version.installmentFrequency,
       interestType: version.interestType as 'FLAT' | 'REDUCING' | 'ZERO_COST',
       interestRateAnnual: version.interestRateAnnual ?? undefined,
+      interestBasis: version.interestBasis as 'FINANCED_PRINCIPAL' | 'TOTAL_CASH_PRICE',
+      manualFinanceCharges: dto.manualInterestAmount,
       feeRules: (version.feeRules as unknown as FeeRuleInput[]) ?? [],
       startDate,
     });
@@ -100,6 +102,8 @@ export class LoansService {
       installmentFrequency: version.installmentFrequency,
       interestType: version.interestType as 'FLAT' | 'REDUCING' | 'ZERO_COST',
       interestRateAnnual: version.interestRateAnnual ?? undefined,
+      interestBasis: version.interestBasis as 'FINANCED_PRINCIPAL' | 'TOTAL_CASH_PRICE',
+      manualFinanceCharges: dto.manualInterestAmount,
       feeRules: (version.feeRules as unknown as FeeRuleInput[]) ?? [],
       startDate,
     });

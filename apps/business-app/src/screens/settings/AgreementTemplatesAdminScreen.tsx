@@ -9,6 +9,7 @@ import { AgreementTemplateKey, ApiError } from '@sptc/shared';
 const SECTIONS: { key: AgreementTemplateKey; label: string; placeholderTitle: string }[] = [
   { key: AgreementTemplateKey.TERMS_OF_SERVICE, label: 'Terms of Service', placeholderTitle: 'Terms of Service' },
   { key: AgreementTemplateKey.LOAN_AGREEMENT_DEFAULT, label: 'Default Loan Agreement', placeholderTitle: 'Loan Agreement' },
+  { key: AgreementTemplateKey.PRIVACY_POLICY, label: 'Privacy Policy', placeholderTitle: 'Privacy Policy' },
 ];
 
 export function AgreementTemplatesAdminScreen() {

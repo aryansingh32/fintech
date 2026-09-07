@@ -31,6 +31,13 @@ export class CreateLoanDto {
   @IsOptional()
   @IsString()
   startDate?: string; // ISO date; defaults to now
+
+  // Staff-chosen finance-charge override, entered directly at loan-creation
+  // time instead of relying on the plan's rate formula.
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  manualInterestAmount?: number;
 }
 
 export class PreviewLoanDto {
@@ -52,6 +59,11 @@ export class PreviewLoanDto {
   @IsOptional()
   @IsString()
   startDate?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  manualInterestAmount?: number;
 }
 
 export class RescheduleInstallmentDto {

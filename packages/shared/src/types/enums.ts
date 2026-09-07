@@ -6,6 +6,8 @@
  */
 
 export enum StaffRole {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  ADMIN = 'ADMIN',
   OWNER = 'OWNER',
   MANAGER = 'MANAGER',
   SHOPKEEPER = 'SHOPKEEPER',
@@ -144,4 +146,5 @@ export enum NotificationStatus {
 export enum AgreementTemplateKey {
   TERMS_OF_SERVICE = 'TERMS_OF_SERVICE',
   LOAN_AGREEMENT_DEFAULT = 'LOAN_AGREEMENT_DEFAULT',
+  PRIVACY_POLICY = 'PRIVACY_POLICY',
 }

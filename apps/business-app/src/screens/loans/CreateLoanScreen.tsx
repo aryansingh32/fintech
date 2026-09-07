@@ -33,14 +33,17 @@ export function CreateLoanScreen() {
   const [cashPrice, setCashPrice] = useState('');
   const [downPayment, setDownPayment] = useState('0');
   const [installments, setInstallments] = useState('6');
+  const [manualInterest, setManualInterest] = useState('');
 
   const selectedVersion = loanProducts?.flatMap((p) => p.versions ?? []).find((v) => v.id === versionId);
+  const manualInterestAmount = manualInterest.trim() ? Number(manualInterest) : undefined;
 
   const preview = useLoanPreview({
     loanProductVersionId: versionId,
     cashPrice: Number(cashPrice) || 0,
     downPaymentAmount: Number(downPayment) || 0,
     numberOfInstallments: Number(installments) || 0,
+    manualInterestAmount,
   });
 
   const onSubmit = async () => {
@@ -56,6 +59,7 @@ export function CreateLoanScreen() {
         cashPrice: Number(cashPrice),
         downPaymentAmount: Number(downPayment),
         numberOfInstallments: Number(installments),
+        manualInterestAmount,
       });
       navigation.replace('LoanDetail', { loanId: loan.id });
     } catch (err) {
@@ -116,6 +120,11 @@ export function CreateLoanScreen() {
         <NumberField label="Cash Price" value={cashPrice} onChangeText={setCashPrice} />
         <NumberField label="Down Payment" value={downPayment} onChangeText={setDownPayment} />
         <NumberField label="Number of Installments" value={installments} onChangeText={setInstallments} />
+        <NumberField
+          label="Interest Amount (optional - overrides the plan's rate formula)"
+          value={manualInterest}
+          onChangeText={setManualInterest}
+        />
       </Card>
 
       {preview.data ? (

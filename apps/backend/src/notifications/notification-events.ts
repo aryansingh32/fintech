@@ -16,6 +16,8 @@ export enum NotificationEvent {
   AGREEMENT_AVAILABLE = 'AGREEMENT_AVAILABLE',
   SUPPORT_REPLY = 'SUPPORT_REPLY',
   SUPPORT_MESSAGE_RECEIVED = 'SUPPORT_MESSAGE_RECEIVED',
+  SUPPORT_TICKET_APPROVED = 'SUPPORT_TICKET_APPROVED',
+  SUPPORT_TICKET_CLOSED = 'SUPPORT_TICKET_CLOSED',
   SECURITY_ALERT = 'SECURITY_ALERT',
   PAYMENT_REVERSED = 'PAYMENT_REVERSED',
   EMI_RESCHEDULED = 'EMI_RESCHEDULED',
@@ -98,6 +100,20 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationEvent, NotificationTempl
   [NotificationEvent.SUPPORT_MESSAGE_RECEIVED]: {
     title: { en: 'New support message', hi: 'नया सहायता संदेश' },
     body: { en: 'New message on ticket {{ticketNumber}}.', hi: 'टिकट {{ticketNumber}} पर नया संदेश।' },
+  },
+  [NotificationEvent.SUPPORT_TICKET_APPROVED]: {
+    title: { en: 'Chat opened', hi: 'चैट शुरू हुई' },
+    body: {
+      en: 'Your ticket {{ticketNumber}} was approved - you can chat with us now.',
+      hi: 'आपका टिकट {{ticketNumber}} स्वीकृत हो गया है - अब आप हमसे चैट कर सकते हैं।',
+    },
+  },
+  [NotificationEvent.SUPPORT_TICKET_CLOSED]: {
+    title: { en: 'Chat closed', hi: 'चैट बंद हुई' },
+    body: {
+      en: 'Your conversation on ticket {{ticketNumber}} has been closed.',
+      hi: 'टिकट {{ticketNumber}} पर आपकी बातचीत बंद कर दी गई है।',
+    },
   },
   [NotificationEvent.SECURITY_ALERT]: {
     title: { en: 'Security alert', hi: 'सुरक्षा चेतावनी' },

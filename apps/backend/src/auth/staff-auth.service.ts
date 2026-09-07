@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { AuditActorType, OtpPurpose, SubjectType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -40,6 +40,9 @@ export class StaffAuthService {
     if (!staff) {
       throw new UnauthorizedException('No staff account is linked to this Google email yet.');
     }
+    if (!staff.isApproved) {
+      throw new ForbiddenException('Your account is pending approval by the super admin.');
+    }
 
     return this.completeLogin(staff.id, device, ipAddress);
   }
@@ -55,6 +58,10 @@ export class StaffAuthService {
 
     const passwordValid = await argon2.verify(staff.passwordHash, password);
     if (!passwordValid) throw new UnauthorizedException('Invalid credentials.');
+
+    if (!staff.isApproved) {
+      throw new ForbiddenException('Your account is pending approval by the super admin.');
+    }
 
     const knownDevice = await this.prisma.device.findFirst({
       where: {
@@ -97,6 +104,9 @@ export class StaffAuthService {
     ipAddress?: string,
   ): Promise<StaffLoginResult> {
     const staff = await this.prisma.staffUser.findUniqueOrThrow({ where: { id: staffUserId } });
+    if (!staff.isApproved) {
+      throw new ForbiddenException('Your account is pending approval by the super admin.');
+    }
 
     const deviceRow = await this.sessions.upsertDevice(
       { subjectType: SubjectType.STAFF, staffUserId: staff.id },

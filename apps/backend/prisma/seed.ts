@@ -26,6 +26,28 @@ async function main() {
     },
   });
 
+  // Root super-admin account, provisioned only when configured via env (kept
+  // out of source control - see apps/backend/.env / .env.example). Skipped
+  // silently if not configured, so this seed script stays safe to run in any
+  // environment (CI, a fresh dev clone) without accidentally creating an
+  // account with a default/guessable password.
+  if (process.env.SEED_SUPERADMIN_MOBILE && process.env.SEED_SUPERADMIN_PASSWORD) {
+    await prisma.staffUser.upsert({
+      where: { mobile: process.env.SEED_SUPERADMIN_MOBILE },
+      update: {},
+      create: {
+        branchId: branch.id,
+        name: process.env.SEED_SUPERADMIN_NAME ?? 'Super Admin',
+        mobile: process.env.SEED_SUPERADMIN_MOBILE,
+        email: process.env.SEED_SUPERADMIN_EMAIL,
+        passwordHash: await argon2.hash(process.env.SEED_SUPERADMIN_PASSWORD),
+        role: 'SUPER_ADMIN',
+        isGlobal: true,
+        isApproved: true,
+      },
+    });
+  }
+
   const loanProduct = await prisma.loanProduct.upsert({
     where: { id: 'seed-zero-cost-plan' },
     update: {},

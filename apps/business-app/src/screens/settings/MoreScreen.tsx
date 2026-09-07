@@ -7,7 +7,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { colors, spacing, typography } from '@/theme/theme';
 import { Card } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
-import { canManageAgreements, roleLabel } from '@/rbac/uiPermissions';
+import { canManageAgreements, canManageBranchesAndStaff, roleLabel } from '@/rbac/uiPermissions';
 import { MainTabParamList, RootStackParamList } from '@/navigation/types';
 
 type Nav = CompositeNavigationProp<BottomTabNavigationProp<MainTabParamList, 'More'>, NativeStackNavigationProp<RootStackParamList>>;
@@ -30,16 +30,10 @@ export function MoreScreen() {
       {identity && canManageAgreements(identity.role) ? (
         <MenuRow label="Manage Agreements" onPress={() => navigation.navigate('AgreementTemplatesAdmin')} />
       ) : null}
-      <MenuRow label="Profile & Logout" onPress={() => navigation.navigate('Profile')} />
-
-      {identity?.isGlobal ? (
-        <Card style={styles.noteCard}>
-          <Text style={styles.caption}>
-            Branch, staff, and permission management is not yet built in this app - use `npx prisma studio` or the seed
-            script on the backend for now.
-          </Text>
-        </Card>
+      {identity && canManageBranchesAndStaff(identity.role) ? (
+        <MenuRow label="Manage Staff & Approvals" onPress={() => navigation.navigate('StaffManagement')} />
       ) : null}
+      <MenuRow label="Profile & Logout" onPress={() => navigation.navigate('Profile')} />
     </ScrollView>
   );
 }

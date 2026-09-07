@@ -12,6 +12,7 @@ import {
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
 import { LoadingState } from '@/components/ui';
+import { OtpIslandBannerProvider } from '@/components/OtpIslandBanner';
 import { AuthProvider } from '@/auth/AuthContext';
 import { RootNavigator } from '@/navigation/RootNavigator';
 
@@ -53,10 +54,12 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <StatusBar style="dark" />
-        <RootNavigator />
-      </AuthProvider>
+      <OtpIslandBannerProvider>
+        <AuthProvider>
+          <StatusBar style="dark" />
+          <RootNavigator />
+        </AuthProvider>
+      </OtpIslandBannerProvider>
     </QueryClientProvider>
   );
 }

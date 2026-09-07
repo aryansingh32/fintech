@@ -9,12 +9,14 @@ import { StaffRole } from '@sptc/shared';
  * still see a button here and get a 403 from the server when they tap it -
  * that's a display gap, not a security one.
  */
+
+/** Only SUPER_ADMIN can create/approve/reject other staff accounts (Permission.STAFF_MANAGE - see DEFAULT_ROLE_PERMISSIONS). */
 export function canManageBranchesAndStaff(role: StaffRole): boolean {
-  return role === StaffRole.OWNER;
+  return role === StaffRole.SUPER_ADMIN;
 }
 
 export function canApproveLoans(role: StaffRole): boolean {
-  return role === StaffRole.OWNER || role === StaffRole.MANAGER || role === StaffRole.SHOPKEEPER;
+  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SHOPKEEPER].includes(role);
 }
 
 export function canCollectPayments(role: StaffRole): boolean {
@@ -22,19 +24,24 @@ export function canCollectPayments(role: StaffRole): boolean {
 }
 
 export function canViewReports(role: StaffRole): boolean {
-  return role === StaffRole.OWNER || role === StaffRole.MANAGER || role === StaffRole.SHOPKEEPER;
+  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SHOPKEEPER].includes(role);
 }
 
 export function canManageCustomersAndLoans(role: StaffRole): boolean {
-  return role === StaffRole.OWNER || role === StaffRole.MANAGER || role === StaffRole.SHOPKEEPER;
+  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SHOPKEEPER].includes(role);
 }
 
 export function canUseSupport(role: StaffRole): boolean {
-  return role === StaffRole.OWNER || role === StaffRole.MANAGER || role === StaffRole.SUPPORT_AGENT;
+  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SUPPORT_AGENT].includes(role);
 }
 
 export function canManageAgreements(role: StaffRole): boolean {
-  return role === StaffRole.OWNER || role === StaffRole.MANAGER;
+  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER, StaffRole.MANAGER].includes(role);
+}
+
+/** Mirrors StaffUser.isGlobal for the two new top-of-hierarchy roles, so "Manage Loan Products" etc. also show for them. */
+export function isGlobalRole(role: StaffRole): boolean {
+  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER].includes(role);
 }
 
 export function roleLabel(role: StaffRole): string {

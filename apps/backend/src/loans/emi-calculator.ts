@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import { addDaysUtc, addMonthsClamped } from '../common/date-utils';
 
 export type InterestType = 'FLAT' | 'REDUCING' | 'ZERO_COST';
+export type InterestBasis = 'FINANCED_PRINCIPAL' | 'TOTAL_CASH_PRICE';
 export type InstallmentFrequencyInput = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
 
 export interface FeeRuleInput {
@@ -24,6 +25,19 @@ export interface EmiCalculationInput {
    * is a true annual percentage rate used in the standard amortizing formula.
    */
   interestRateAnnual?: Decimal.Value;
+  /**
+   * Which amount interestRateAnnual is applied to. Defaults to
+   * FINANCED_PRINCIPAL (cash price minus down payment) for backward
+   * compatibility. TOTAL_CASH_PRICE applies the rate to the full product
+   * value including the down payment instead.
+   */
+  interestBasis?: InterestBasis;
+  /**
+   * Staff-chosen override, set directly at loan-creation time instead of
+   * relying on the product's rate formula. When provided, this becomes the
+   * finance charges for the whole loan regardless of interestType/rate.
+   */
+  manualFinanceCharges?: Decimal.Value;
   feeRules: FeeRuleInput[];
   startDate: Date;
 }
@@ -73,13 +87,17 @@ export function calculateEmiSchedule(input: EmiCalculationInput): EmiCalculation
 
   const financedPrincipal = round2(cashPrice.minus(downPayment));
 
-  const financeCharges = calculateFinanceCharges(
-    financedPrincipal,
-    n,
-    input.installmentFrequency,
-    input.interestType,
-    input.interestRateAnnual,
-  );
+  const financeCharges =
+    input.manualFinanceCharges !== undefined
+      ? round2(new Decimal(input.manualFinanceCharges))
+      : calculateFinanceCharges(
+          financedPrincipal,
+          input.interestBasis === 'TOTAL_CASH_PRICE' ? cashPrice : financedPrincipal,
+          n,
+          input.installmentFrequency,
+          input.interestType,
+          input.interestRateAnnual,
+        );
 
   const feesTotal = calculateFees(financedPrincipal, input.feeRules);
 
@@ -108,6 +126,7 @@ export function calculateEmiSchedule(input: EmiCalculationInput): EmiCalculation
 
 function calculateFinanceCharges(
   principal: Decimal,
+  interestBase: Decimal,
   n: number,
   frequency: InstallmentFrequencyInput,
   interestType: InterestType,
@@ -121,8 +140,10 @@ function calculateFinanceCharges(
   const periodsPerYear = PERIODS_PER_YEAR[frequency];
 
   if (interestType === 'FLAT') {
-    // Charged once on the full principal for the whole term - not annualized/pro-rated.
-    return principal.times(rate);
+    // Charged once for the whole term - not annualized/pro-rated. Applied to
+    // interestBase, which is either the financed principal or the full cash
+    // price (including down payment), per the plan's interestBasis.
+    return interestBase.times(rate);
   }
 
   // REDUCING balance: standard amortizing-loan EMI formula.

@@ -11,6 +11,11 @@ import type { LoanProduct, LoanProductVersion } from '@sptc/shared';
 
 const INTEREST_TYPES = ['ZERO_COST', 'FLAT', 'REDUCING'] as const;
 const FREQUENCIES = ['MONTHLY', 'BIWEEKLY', 'WEEKLY'] as const;
+const INTEREST_BASES = ['FINANCED_PRINCIPAL', 'TOTAL_CASH_PRICE'] as const;
+const INTEREST_BASIS_LABEL: Record<(typeof INTEREST_BASES)[number], string> = {
+  FINANCED_PRINCIPAL: 'Financed amount (cash price minus down payment)',
+  TOTAL_CASH_PRICE: 'Total product value (including down payment)',
+};
 
 export function LoanProductsAdminScreen() {
   const { data: loanProducts, refetch } = useLoanProducts();
@@ -18,6 +23,7 @@ export function LoanProductsAdminScreen() {
   const [interestType, setInterestType] = useState<(typeof INTEREST_TYPES)[number]>('ZERO_COST');
   const [frequency, setFrequency] = useState<(typeof FREQUENCIES)[number]>('MONTHLY');
   const [interestRate, setInterestRate] = useState('0');
+  const [interestBasis, setInterestBasis] = useState<(typeof INTEREST_BASES)[number]>('FINANCED_PRINCIPAL');
   const [minInstallments, setMinInstallments] = useState('1');
   const [maxInstallments, setMaxInstallments] = useState('12');
 
@@ -27,6 +33,7 @@ export function LoanProductsAdminScreen() {
       await apiClient.loanProducts.createVersion(product.id, {
         interestType,
         interestRateAnnual: interestType === 'ZERO_COST' ? undefined : Number(interestRate),
+        interestBasis,
         minInstallments: Number(minInstallments),
         maxInstallments: Number(maxInstallments),
         installmentFrequency: frequency,
@@ -90,6 +97,21 @@ export function LoanProductsAdminScreen() {
                 : 'Annual Interest Rate (%) - reducing balance'}
             </Text>
             <TextInput value={interestRate} onChangeText={setInterestRate} keyboardType="decimal-pad" style={styles.input} />
+
+            <Text style={styles.label}>Apply interest to</Text>
+            <View style={styles.chipRow}>
+              {INTEREST_BASES.map((b) => (
+                <Pressable
+                  key={b}
+                  onPress={() => setInterestBasis(b)}
+                  style={[styles.chip, interestBasis === b && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, interestBasis === b && styles.chipTextActive]}>
+                    {INTEREST_BASIS_LABEL[b]}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </>
         ) : null}
 
@@ -202,7 +224,9 @@ function LoanProductCard({ product, onChanged }: { product: LoanProduct; onChang
       {(product.versions ?? []).map((v) => (
         <View key={v.id} style={styles.versionRow}>
           <Text style={[styles.caption, !v.isActive && styles.captionInactive]}>
-            v{v.versionNumber} · {v.interestType} · {v.installmentFrequency} · {v.minInstallments}-{v.maxInstallments} installments
+            v{v.versionNumber} · {v.interestType}
+            {v.interestType !== 'ZERO_COST' ? ` on ${v.interestBasis === 'TOTAL_CASH_PRICE' ? 'total value' : 'financed amount'}` : ''} ·{' '}
+            {v.installmentFrequency} · {v.minInstallments}-{v.maxInstallments} installments
             {!v.isActive ? ' · inactive' : ''}
           </Text>
           <Pressable onPress={() => toggleVersionActive(v)} disabled={busy}>

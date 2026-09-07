@@ -40,6 +40,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         code = (b.code as string) ?? this.codeForStatus(status);
       }
       if (status >= 500) {
+        // A 5xx HttpException (e.g. ServiceUnavailableException for an
+        // unconfigured provider) still needs to reach the logs - only the
+        // client-facing message gets masked below, not the server record.
+        this.logger.error(
+          `5xx HttpException on ${request.method} ${request.url}: ${message}`,
+        );
         message = "We couldn't complete your request right now. Please try again.";
       }
     } else {

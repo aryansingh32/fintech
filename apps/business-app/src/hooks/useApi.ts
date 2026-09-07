@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/apiClient';
-import { AgreementTemplateKey, LoanStatus, SupportAttachmentInput, SupportTicketStatus } from '@sptc/shared';
+import { AgreementTemplateKey, LoanStatus, StaffRole, SupportAttachmentInput, SupportTicketStatus } from '@sptc/shared';
 
 // ---------------------------------------------------------------------
 // Sessions / devices
@@ -218,6 +218,7 @@ export function useLoanPreview(dto: {
   cashPrice: number;
   downPaymentAmount: number;
   numberOfInstallments: number;
+  manualInterestAmount?: number;
 }) {
   return useQuery({
     queryKey: ['loans', 'preview', dto],
@@ -227,6 +228,7 @@ export function useLoanPreview(dto: {
         cashPrice: dto.cashPrice,
         downPaymentAmount: dto.downPaymentAmount,
         numberOfInstallments: dto.numberOfInstallments,
+        manualInterestAmount: dto.manualInterestAmount,
       }),
     enabled: Boolean(dto.loanProductVersionId) && dto.cashPrice > 0 && dto.numberOfInstallments > 0,
   });
@@ -397,6 +399,14 @@ export function useUpdateTicketStatus(ticketId: string) {
   });
 }
 
+export function useApproveTicket(ticketId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.support.approve(ticketId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['support'] }),
+  });
+}
+
 // ---------------------------------------------------------------------
 // Reports
 // ---------------------------------------------------------------------
@@ -448,5 +458,37 @@ export function usePaymentReconciliation() {
   return useQuery({
     queryKey: ['reports', 'payment-reconciliation'],
     queryFn: () => apiClient.reports.paymentReconciliation(),
+  });
+}
+
+// ---------------------------------------------------------------------
+// Staff management (SUPER_ADMIN only)
+// ---------------------------------------------------------------------
+export function useStaffAccounts() {
+  return useQuery({ queryKey: ['staff'], queryFn: () => apiClient.staff.list() });
+}
+
+export function useCreateStaffAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: { name: string; mobile: string; email?: string; password: string; role: StaffRole; branchId?: string }) =>
+      apiClient.staff.create(dto),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['staff'] }),
+  });
+}
+
+export function useApproveStaffAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.staff.approve(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['staff'] }),
+  });
+}
+
+export function useRejectStaffAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) => apiClient.staff.reject(id, reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['staff'] }),
   });
 }

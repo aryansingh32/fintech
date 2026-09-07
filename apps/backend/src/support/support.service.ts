@@ -89,6 +89,16 @@ export class SupportService {
     const senderType = user.subjectType === SubjectType.CUSTOMER ? SupportSenderType.CUSTOMER : SupportSenderType.STAFF;
     const uploaderType = user.subjectType === SubjectType.CUSTOMER ? SubjectType.CUSTOMER : SubjectType.STAFF;
 
+    // The customer's initial problem description is sent as part of ticket
+    // creation, not through this endpoint - so any reply attempt here from a
+    // customer on a not-yet-approved ticket is blocked until staff opens the chat.
+    if (senderType === SupportSenderType.CUSTOMER && !ticket.chatApprovedAt) {
+      throw new ForbiddenException('Your ticket is awaiting approval. We will notify you once a staff member opens the chat.');
+    }
+    if (ticket.status === SupportTicketStatus.CLOSED || ticket.status === SupportTicketStatus.RESOLVED) {
+      throw new ForbiddenException('This conversation has been closed.');
+    }
+
     const created = await this.prisma.supportMessage.create({
       data: {
         ticketId,
@@ -123,6 +133,37 @@ export class SupportService {
     }
 
     return created;
+  }
+
+  /** Staff reviews a raised ticket and opens the chat - customer can only send further messages after this. */
+  async approve(ticketId: string, actor: AuthUser) {
+    const ticket = await this.findById(ticketId, actor);
+    const updated = await this.prisma.supportTicket.update({
+      where: { id: ticketId },
+      data: {
+        chatApprovedAt: new Date(),
+        status: ticket.status === SupportTicketStatus.OPEN ? SupportTicketStatus.IN_PROGRESS : ticket.status,
+        assignedStaffId: ticket.assignedStaffId ?? actor.id,
+      },
+    });
+
+    await this.audit.record({
+      actorType: AuditActorType.STAFF,
+      actorId: actor.id,
+      role: actor.role,
+      action: 'SUPPORT_TICKET_APPROVED',
+      entityType: 'SupportTicket',
+      entityId: ticketId,
+    });
+
+    const ids = await this.notifications.enqueue(this.prisma, {
+      event: NotificationEvent.SUPPORT_TICKET_APPROVED,
+      customerId: ticket.customerId,
+      payload: { ticketNumber: ticket.ticketNumber },
+    });
+    await this.notifications.dispatchAll(ids);
+
+    return updated;
   }
 
   async assign(ticketId: string, staffId: string, actor: AuthUser) {
@@ -165,7 +206,7 @@ export class SupportService {
   }
 
   async updateStatus(ticketId: string, status: SupportTicketStatus, actor: AuthUser) {
-    await this.findById(ticketId, actor);
+    const ticket = await this.findById(ticketId, actor);
     const updated = await this.prisma.supportTicket.update({ where: { id: ticketId }, data: { status } });
     await this.audit.record({
       actorType: AuditActorType.STAFF,
@@ -176,6 +217,16 @@ export class SupportService {
       entityId: ticketId,
       afterState: { status },
     });
+
+    if (status === SupportTicketStatus.CLOSED || status === SupportTicketStatus.RESOLVED) {
+      const ids = await this.notifications.enqueue(this.prisma, {
+        event: NotificationEvent.SUPPORT_TICKET_CLOSED,
+        customerId: ticket.customerId,
+        payload: { ticketNumber: ticket.ticketNumber },
+      });
+      await this.notifications.dispatchAll(ids);
+    }
+
     return updated;
   }
 }

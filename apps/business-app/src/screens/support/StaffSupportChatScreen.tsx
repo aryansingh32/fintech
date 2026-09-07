@@ -6,6 +6,7 @@ import { useRoute, RouteProp } from '@react-navigation/native';
 import { colors, radius, spacing, typography } from '@/theme/theme';
 import { ErrorState, LoadingState, PrimaryButton } from '@/components/ui';
 import {
+  useApproveTicket,
   useEscalateTicket,
   useStaffAddMessage,
   useStaffSupportTicket,
@@ -23,6 +24,7 @@ export function StaffSupportChatScreen() {
   const uploadAttachment = useUploadSupportAttachment();
   const escalate = useEscalateTicket(route.params.ticketId);
   const updateStatus = useUpdateTicketStatus(route.params.ticketId);
+  const approveTicket = useApproveTicket(route.params.ticketId);
   const [text, setText] = useState('');
 
   if (isLoading) return <LoadingState label="Loading conversation..." />;
@@ -66,6 +68,18 @@ export function StaffSupportChatScreen() {
 
   const onResolve = () => updateStatus.mutate(SupportTicketStatus.RESOLVED);
 
+  const onApprove = () => approveTicket.mutate();
+
+  const onEndChat = () => {
+    Alert.alert('End chat', 'End this conversation? The customer will not be able to send further messages.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'End Chat', style: 'destructive', onPress: () => updateStatus.mutate(SupportTicketStatus.CLOSED) },
+    ]);
+  };
+
+  const isClosed = ticket.status === SupportTicketStatus.CLOSED || ticket.status === SupportTicketStatus.RESOLVED;
+  const awaitingApproval = !ticket.chatApprovedAt;
+
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.header}>
@@ -73,14 +87,23 @@ export function StaffSupportChatScreen() {
         <Text style={styles.caption}>
           {ticket.customer?.name} · {ticket.category} · {ticket.status.replace('_', ' ')}
         </Text>
-        <View style={styles.actionsRow}>
-          <View style={{ flex: 1 }}>
-            <PrimaryButton label="Escalate" onPress={onEscalate} variant="secondary" loading={escalate.isPending} />
+        {awaitingApproval ? (
+          <View style={{ marginTop: spacing.md }}>
+            <PrimaryButton label="Approve & Open Chat" onPress={onApprove} loading={approveTicket.isPending} />
           </View>
-          <View style={{ flex: 1 }}>
-            <PrimaryButton label="Mark Resolved" onPress={onResolve} variant="secondary" loading={updateStatus.isPending} />
+        ) : !isClosed ? (
+          <View style={styles.actionsRow}>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton label="Escalate" onPress={onEscalate} variant="secondary" loading={escalate.isPending} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton label="Mark Resolved" onPress={onResolve} variant="secondary" loading={updateStatus.isPending} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton label="End Chat" onPress={onEndChat} variant="secondary" loading={updateStatus.isPending} />
+            </View>
           </View>
-        </View>
+        ) : null}
       </View>
 
       <FlatList
@@ -105,27 +128,37 @@ export function StaffSupportChatScreen() {
         }}
       />
 
-      <View style={styles.inputRow}>
-        <Pressable onPress={onAttach} style={styles.attachButton} disabled={uploadAttachment.isPending}>
-          <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
-        </Pressable>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          placeholder="Reply to customer..."
-          placeholderTextColor={colors.textSecondary}
-          style={styles.input}
-          multiline
-        />
-        <View style={{ width: 90 }}>
-          <PrimaryButton
-            label="Send"
-            onPress={onSend}
-            loading={addMessage.isPending || uploadAttachment.isPending}
-            disabled={!text.trim()}
-          />
+      {isClosed ? (
+        <View style={styles.closedBanner}>
+          <Text style={styles.closedBannerText}>This conversation has been closed.</Text>
         </View>
-      </View>
+      ) : awaitingApproval ? (
+        <View style={styles.closedBanner}>
+          <Text style={styles.closedBannerText}>Approve this ticket above to start chatting with the customer.</Text>
+        </View>
+      ) : (
+        <View style={styles.inputRow}>
+          <Pressable onPress={onAttach} style={styles.attachButton} disabled={uploadAttachment.isPending}>
+            <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
+          </Pressable>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Reply to customer..."
+            placeholderTextColor={colors.textSecondary}
+            style={styles.input}
+            multiline
+          />
+          <View style={{ width: 90 }}>
+            <PrimaryButton
+              label="Send"
+              onPress={onSend}
+              loading={addMessage.isPending || uploadAttachment.isPending}
+              disabled={!text.trim()}
+            />
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -157,4 +190,6 @@ const styles = StyleSheet.create({
   },
   attachButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   input: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, maxHeight: 100, color: colors.textPrimary },
+  closedBanner: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surfaceMuted },
+  closedBannerText: { ...typography.caption, color: colors.textSecondary, textAlign: 'center' },
 });

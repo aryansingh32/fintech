@@ -55,6 +55,10 @@ export class CreateLoanProductVersionDto {
   @IsNumber()
   interestRateAnnual?: number;
 
+  @IsOptional()
+  @IsIn(['FINANCED_PRINCIPAL', 'TOTAL_CASH_PRICE'])
+  interestBasis?: 'FINANCED_PRINCIPAL' | 'TOTAL_CASH_PRICE';
+
   @IsInt()
   @Min(1)
   minInstallments: number;
