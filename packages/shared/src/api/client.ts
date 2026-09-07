@@ -395,6 +395,10 @@ export class ApiClient {
         newDueDate,
         reason,
       }),
+    applyPenalty: (loanId: string, installmentId: string, amount: number, reason: string) =>
+      this.request<Installment>('POST', `/loans/${loanId}/installments/${installmentId}/penalty`, { amount, reason }),
+    notifyOverdue: (loanId: string, installmentId: string) =>
+      this.request<{ success: boolean }>('POST', `/loans/${loanId}/installments/${installmentId}/notify-overdue`, {}),
   };
 
   // ---------------------------------------------------------------------

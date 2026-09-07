@@ -1,6 +1,6 @@
 export type AuthStackParamList = {
   MobileLogin: undefined;
-  OtpVerify: { mobile: string };
+  OtpVerify: { mobile: string; devOtp?: string };
   CreatePin: undefined;
 };
 

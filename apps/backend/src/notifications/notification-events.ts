@@ -23,6 +23,7 @@ export enum NotificationEvent {
   EMI_RESCHEDULED = 'EMI_RESCHEDULED',
   KYC_VERIFIED = 'KYC_VERIFIED',
   KYC_REJECTED = 'KYC_REJECTED',
+  PENALTY_APPLIED = 'PENALTY_APPLIED',
 }
 
 export type SupportedLocale = 'en' | 'hi';
@@ -138,6 +139,13 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationEvent, NotificationTempl
     body: {
       en: 'Your {{documentType}} has been verified. Your KYC is now complete.',
       hi: 'आपका {{documentType}} सत्यापित हो गया है। आपका KYC अब पूर्ण है।',
+    },
+  },
+  [NotificationEvent.PENALTY_APPLIED]: {
+    title: { en: 'Late payment penalty added', hi: 'विलंब शुल्क जोड़ा गया' },
+    body: {
+      en: 'A penalty of ₹{{amount}} was added to EMI {{sequence}} of {{loanNumber}} for late payment.',
+      hi: '{{loanNumber}} की EMI {{sequence}} पर देरी से भुगतान के लिए ₹{{amount}} का विलंब शुल्क जोड़ा गया।',
     },
   },
   [NotificationEvent.KYC_REJECTED]: {

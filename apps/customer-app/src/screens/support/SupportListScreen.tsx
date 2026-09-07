@@ -7,6 +7,7 @@ import { Card, EmptyState, ErrorState, LoadingState, PrimaryButton } from '@/com
 import { useCreateSupportTicket, useSupportTickets } from '@/hooks/useApi';
 import { formatDate } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
+import { TAB_BAR_CLEARANCE } from '@/navigation/MainTabsNavigator';
 import { SupportCategory, ApiError } from '@sptc/shared';
 
 const CATEGORIES: SupportCategory[] = [
@@ -134,7 +135,7 @@ const styles = StyleSheet.create({
   lastMessage: { ...typography.body, color: colors.textPrimary, marginTop: spacing.xs },
   statusPill: { backgroundColor: colors.brandSoft, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   statusText: { ...typography.captionStrong, color: colors.brand },
-  fabWrap: { position: 'absolute', bottom: spacing.lg, left: spacing.lg, right: spacing.lg },
+  fabWrap: { position: 'absolute', bottom: TAB_BAR_CLEARANCE, left: spacing.lg, right: spacing.lg },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.xl },
   modalTitle: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.md },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, radius, spacing, typography } from '@/theme/theme';
@@ -54,21 +54,21 @@ export function ProfileScreen() {
 
 function MenuItem({ label, badge, onPress }: { label: string; badge?: string; onPress: () => void }) {
   return (
-    <Card style={styles.menuItem}>
-      <Text style={styles.menuLabel} onPress={onPress}>
-        {label}
-      </Text>
-      <View style={styles.menuRight}>
-        {badge ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge.replace('_', ' ')}</Text>
+    <Pressable onPress={onPress} hitSlop={8}>
+      {({ pressed }) => (
+        <Card style={pressed ? { ...styles.menuItem, ...styles.menuItemPressed } : styles.menuItem}>
+          <Text style={styles.menuLabel}>{label}</Text>
+          <View style={styles.menuRight}>
+            {badge ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{badge.replace('_', ' ')}</Text>
+              </View>
+            ) : null}
+            <Text style={styles.chevron}>›</Text>
           </View>
-        ) : null}
-        <Text style={styles.chevron} onPress={onPress}>
-          ›
-        </Text>
-      </View>
-    </Card>
+        </Card>
+      )}
+    </Pressable>
   );
 }
 
@@ -90,6 +90,7 @@ const styles = StyleSheet.create({
   caption: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   customerCode: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   menuItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md },
+  menuItemPressed: { opacity: 0.6 },
   menuLabel: { ...typography.body, color: colors.textPrimary },
   menuRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   chevron: { ...typography.h2, color: colors.textSecondary },

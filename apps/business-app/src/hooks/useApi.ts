@@ -213,6 +213,21 @@ export function useRescheduleInstallment(loanId: string) {
   });
 }
 
+export function useApplyPenalty(loanId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ installmentId, amount, reason }: { installmentId: string; amount: number; reason: string }) =>
+      apiClient.loans.applyPenalty(loanId, installmentId, amount, reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loans', 'detail', loanId] }),
+  });
+}
+
+export function useNotifyOverdue(loanId: string) {
+  return useMutation({
+    mutationFn: (installmentId: string) => apiClient.loans.notifyOverdue(loanId, installmentId),
+  });
+}
+
 export function useLoanPreview(dto: {
   loanProductVersionId?: string;
   cashPrice: number;

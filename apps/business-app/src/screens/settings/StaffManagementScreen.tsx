@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { colors, radius, spacing, typography } from '@/theme/theme';
 import { Card, PrimaryButton } from '@/components/ui';
 import { useApproveStaffAccount, useCreateStaffAccount, useRejectStaffAccount, useStaffAccounts } from '@/hooks/useApi';
+import { useAuth } from '@/auth/AuthContext';
 import { formatDate } from '@/utils/format';
 import { roleLabel } from '@/rbac/uiPermissions';
 import { ApiError, StaffAccount, StaffRole } from '@sptc/shared';
@@ -21,6 +22,7 @@ const CREATABLE_ROLES: StaffRole[] = [
  * until approved here (see StaffAuthService.login on the backend).
  */
 export function StaffManagementScreen() {
+  const { identity } = useAuth();
   const { data: staff, isLoading, refetch } = useStaffAccounts();
   const createStaff = useCreateStaffAccount();
   const approve = useApproveStaffAccount();
@@ -78,6 +80,29 @@ export function StaffManagementScreen() {
     ]);
   };
 
+  const onRevoke = (id: string, name: string) => {
+    Alert.alert('Revoke access?', `${name} will be immediately blocked from logging in. You can restore access later.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Revoke',
+        style: 'destructive',
+        onPress: () =>
+          reject.mutate(
+            { id, reason: 'Access revoked by super admin' },
+            {
+              onError: (err) => Alert.alert('Could not revoke access', err instanceof ApiError ? err.message : 'Please try again.'),
+            },
+          ),
+      },
+    ]);
+  };
+
+  const onReactivate = (id: string) => {
+    approve.mutate(id, {
+      onError: (err) => Alert.alert('Could not restore access', err instanceof ApiError ? err.message : 'Please try again.'),
+    });
+  };
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Staff & Approvals</Text>
@@ -97,7 +122,13 @@ export function StaffManagementScreen() {
       <Text style={styles.sectionTitle}>All Staff</Text>
       {isLoading ? <Text style={styles.caption}>Loading...</Text> : null}
       {approved.map((s) => (
-        <StaffRow key={s.id} staff={s} />
+        <StaffRow
+          key={s.id}
+          staff={s}
+          isSelf={s.id === identity?.staffUserId}
+          onRevoke={() => onRevoke(s.id, s.name)}
+          onReactivate={() => onReactivate(s.id)}
+        />
       ))}
 
       <Text style={styles.sectionTitle}>Create Staff Account</Text>
@@ -153,18 +184,27 @@ export function StaffManagementScreen() {
 function StaffRow({
   staff,
   pending,
+  isSelf,
   onApprove,
   onReject,
+  onRevoke,
+  onReactivate,
 }: {
   staff: StaffAccount;
   pending?: boolean;
+  isSelf?: boolean;
   onApprove?: () => void;
   onReject?: () => void;
+  onRevoke?: () => void;
+  onReactivate?: () => void;
 }) {
   return (
     <Card style={styles.card}>
       <View style={styles.row}>
-        <Text style={styles.name}>{staff.name}</Text>
+        <Text style={styles.name}>
+          {staff.name}
+          {isSelf ? ' (you)' : ''}
+        </Text>
         {!staff.isActive ? (
           <View style={[styles.statusPill, styles.statusInactive]}>
             <Text style={styles.statusText}>INACTIVE</Text>
@@ -186,6 +226,14 @@ function StaffRow({
           <View style={{ flex: 1 }}>
             <PrimaryButton label="Reject" onPress={onReject ?? (() => {})} variant="secondary" />
           </View>
+        </View>
+      ) : !staff.isActive ? (
+        <View style={{ marginTop: spacing.md }}>
+          <PrimaryButton label="Restore Access" onPress={onReactivate ?? (() => {})} variant="secondary" />
+        </View>
+      ) : !isSelf ? (
+        <View style={{ marginTop: spacing.md }}>
+          <PrimaryButton label="Revoke Access" onPress={onRevoke ?? (() => {})} variant="danger" />
         </View>
       ) : null}
     </Card>

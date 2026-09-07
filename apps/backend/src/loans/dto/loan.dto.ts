@@ -74,6 +74,15 @@ export class RescheduleInstallmentDto {
   reason: string;
 }
 
+export class ApplyPenaltyDto {
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  @IsString()
+  reason: string;
+}
+
 export class ApproveLoanDto {
   @IsIn(['APPROVED', 'DECLINED', 'MANUAL_REVIEW'])
   decision: 'APPROVED' | 'DECLINED' | 'MANUAL_REVIEW';

@@ -9,9 +9,7 @@ import { DashboardScreen } from '@/screens/dashboard/DashboardScreen';
 import { CustomerListScreen } from '@/screens/customers/CustomerListScreen';
 import { LoansTabScreen } from '@/screens/loans/LoansTabScreen';
 import { OverdueListScreen } from '@/screens/collections/OverdueListScreen';
-import { ReportsTabScreen } from '@/screens/reports/ReportsTabScreen';
 import { MoreScreen } from '@/screens/settings/MoreScreen';
-import { StaffSupportListScreen } from '@/screens/support/StaffSupportListScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -22,8 +20,6 @@ const TABS: Record<keyof MainTabParamList, { icon: { active: IconName; inactive:
   Customers: { icon: { active: 'people', inactive: 'people-outline' }, label: 'Customers' },
   Loans: { icon: { active: 'document-text', inactive: 'document-text-outline' }, label: 'Loans' },
   Collections: { icon: { active: 'cash', inactive: 'cash-outline' }, label: 'Collect' },
-  Support: { icon: { active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline' }, label: 'Support' },
-  Reports: { icon: { active: 'bar-chart', inactive: 'bar-chart-outline' }, label: 'Reports' },
   More: { icon: { active: 'grid', inactive: 'grid-outline' }, label: 'More' },
 };
 
@@ -119,8 +115,6 @@ export function MainTabsNavigator() {
       <Tab.Screen name="Customers" component={CustomerListScreen} />
       <Tab.Screen name="Loans" component={LoansTabScreen} />
       <Tab.Screen name="Collections" component={OverdueListScreen} options={{ title: 'Overdue Collections' }} />
-      <Tab.Screen name="Support" component={StaffSupportListScreen} options={{ title: 'Support' }} />
-      <Tab.Screen name="Reports" component={ReportsTabScreen} />
       <Tab.Screen name="More" component={MoreScreen} />
     </Tab.Navigator>
   );

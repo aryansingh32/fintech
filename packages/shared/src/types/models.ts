@@ -210,6 +210,7 @@ export interface Installment {
   dueDate: IsoDateString;
   principalAmount: Money;
   chargesAmount: Money;
+  penaltyAmount?: Money;
   totalAmount: Money;
   paidAmount: Money;
   status: InstallmentStatus;

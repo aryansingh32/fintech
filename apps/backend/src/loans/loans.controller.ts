@@ -8,7 +8,7 @@ import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { Permission } from '../rbac/permissions';
 import { LoansService } from './loans.service';
 import { LoanProductsService } from './loan-products.service';
-import { CreateLoanDto, ApproveLoanDto, PreviewLoanDto, RescheduleInstallmentDto } from './dto/loan.dto';
+import { CreateLoanDto, ApproveLoanDto, ApplyPenaltyDto, PreviewLoanDto, RescheduleInstallmentDto } from './dto/loan.dto';
 import {
   CreateLoanProductDto,
   CreateLoanProductVersionDto,
@@ -65,6 +65,23 @@ export class LoansController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.loans.rescheduleInstallment(id, installmentId, dto, user);
+  }
+
+  @RequirePermissions(Permission.OVERDUE_MANAGE)
+  @Post(':id/installments/:installmentId/penalty')
+  applyPenalty(
+    @Param('id') id: string,
+    @Param('installmentId') installmentId: string,
+    @Body() dto: ApplyPenaltyDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.loans.applyPenalty(id, installmentId, dto, user);
+  }
+
+  @RequirePermissions(Permission.OVERDUE_MANAGE)
+  @Post(':id/installments/:installmentId/notify-overdue')
+  notifyOverdue(@Param('id') id: string, @Param('installmentId') installmentId: string, @CurrentUser() user: AuthUser) {
+    return this.loans.notifyOverdueInstallment(id, installmentId, user);
   }
 }
 

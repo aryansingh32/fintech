@@ -1,6 +1,6 @@
 export type AuthStackParamList = {
   StaffLogin: undefined;
-  DeviceVerify: { mobile: string };
+  DeviceVerify: { mobile: string; devOtp?: string };
 };
 
 export type MainTabParamList = {
@@ -8,8 +8,6 @@ export type MainTabParamList = {
   Customers: undefined;
   Loans: undefined;
   Collections: undefined;
-  Support: undefined;
-  Reports: undefined;
   More: undefined;
 };
 
@@ -28,6 +26,7 @@ export type RootStackParamList = {
   AuditLog: undefined;
   SupportList: undefined;
   SupportChat: { ticketId: string };
+  Reports: undefined;
   LoanProductsAdmin: undefined;
   AgreementTemplatesAdmin: undefined;
   StaffManagement: undefined;

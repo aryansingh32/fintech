@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { CompositeNavigationProp } from '@react-navigation/native';
@@ -7,7 +7,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { colors, spacing, typography } from '@/theme/theme';
 import { Card } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
-import { canManageAgreements, canManageBranchesAndStaff, roleLabel } from '@/rbac/uiPermissions';
+import { canManageAgreements, canManageBranchesAndStaff, canUseSupport, canViewReports, roleLabel } from '@/rbac/uiPermissions';
 import { MainTabParamList, RootStackParamList } from '@/navigation/types';
 
 type Nav = CompositeNavigationProp<BottomTabNavigationProp<MainTabParamList, 'More'>, NativeStackNavigationProp<RootStackParamList>>;
@@ -25,6 +25,10 @@ export function MoreScreen() {
         </Card>
       ) : null}
 
+      {identity && canUseSupport(identity.role) ? (
+        <MenuRow label="Support Tickets" onPress={() => navigation.navigate('SupportList')} />
+      ) : null}
+      {identity && canViewReports(identity.role) ? <MenuRow label="Reports" onPress={() => navigation.navigate('Reports')} /> : null}
       <MenuRow label="Activity Log" onPress={() => navigation.navigate('AuditLog')} />
       {identity?.isGlobal ? <MenuRow label="Manage Loan Products" onPress={() => navigation.navigate('LoanProductsAdmin')} /> : null}
       {identity && canManageAgreements(identity.role) ? (
@@ -40,14 +44,14 @@ export function MoreScreen() {
 
 function MenuRow({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <Card style={styles.menuItem}>
-      <Text style={styles.menuLabel} onPress={onPress}>
-        {label}
-      </Text>
-      <Text style={styles.chevron} onPress={onPress}>
-        ›
-      </Text>
-    </Card>
+    <Pressable onPress={onPress} hitSlop={8}>
+      {({ pressed }) => (
+        <Card style={pressed ? { ...styles.menuItem, ...styles.menuItemPressed } : styles.menuItem}>
+          <Text style={styles.menuLabel}>{label}</Text>
+          <Text style={styles.chevron}>›</Text>
+        </Card>
+      )}
+    </Pressable>
   );
 }
 
@@ -58,6 +62,7 @@ const styles = StyleSheet.create({
   role: { ...typography.h2, color: colors.textPrimary },
   caption: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   menuItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  menuItemPressed: { opacity: 0.6 },
   menuLabel: { ...typography.body, color: colors.textPrimary },
   chevron: { ...typography.h2, color: colors.textSecondary },
   noteCard: { marginTop: spacing.lg, backgroundColor: colors.surfaceMuted },

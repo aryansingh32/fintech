@@ -21,6 +21,27 @@ async function getOrCreateDeviceIdentifier(): Promise<string> {
  * See customer-app's device.ts for the fail-soft rationale - a missing token
  * just means no push for this device.
  */
+/**
+ * Requests the OS notification permission proactively at app start (see
+ * App.tsx), instead of it firing for the first time mid-way through the
+ * login/device-verify flow where it can feel like an unrelated
+ * interruption. Safe to call before the staff member is logged in - it
+ * only asks for the permission, it doesn't fetch or register a push token
+ * (there's no account to attach one to yet; that happens in getDeviceInfo()
+ * at login time).
+ */
+export async function ensureNotificationPermission(): Promise<void> {
+  if (!Device.isDevice) return;
+  try {
+    const existing = await Notifications.getPermissionsAsync();
+    if (existing.status !== 'granted' && existing.canAskAgain) {
+      await Notifications.requestPermissionsAsync();
+    }
+  } catch {
+    // Non-fatal - login will simply proceed without a push token.
+  }
+}
+
 async function getNativePushToken(): Promise<string | undefined> {
   if (!Device.isDevice) return undefined;
   try {

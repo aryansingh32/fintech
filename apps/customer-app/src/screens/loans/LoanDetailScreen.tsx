@@ -79,6 +79,9 @@ export function LoanDetailScreen() {
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={styles.installmentAmount}>{formatMoney(installment.totalAmount)}</Text>
                 <StatusBadge status={installment.status} />
+                {Number(installment.penaltyAmount ?? 0) > 0 ? (
+                  <Text style={styles.penaltyCaption}>Includes penalty {formatMoney(installment.penaltyAmount!)}</Text>
+                ) : null}
               </View>
             </View>
           ))}
@@ -118,6 +121,7 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   loanNumber: { ...typography.h2, color: colors.textPrimary },
   caption: { ...typography.caption, color: colors.textSecondary },
+  penaltyCaption: { ...typography.caption, color: colors.statusOverdue, marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.lg, gap: spacing.lg },
   gridItem: { width: '42%' },
   gridValue: { ...typography.bodyStrong, color: colors.textPrimary, marginTop: 2 },

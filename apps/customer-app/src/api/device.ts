@@ -26,6 +26,26 @@ async function getOrCreateDeviceIdentifier(): Promise<string> {
  * customer with zero registered push tokens by failing that notification
  * closed).
  */
+/**
+ * Requests the OS notification permission proactively at app start (see
+ * App.tsx), instead of it firing for the first time mid-way through the
+ * login/OTP flow where it can feel like an unrelated interruption. Safe to
+ * call before the user is logged in - it only asks for the permission, it
+ * doesn't fetch or register a push token (there's no account to attach one
+ * to yet; that happens in getDeviceInfo() at login time).
+ */
+export async function ensureNotificationPermission(): Promise<void> {
+  if (!Device.isDevice) return;
+  try {
+    const existing = await Notifications.getPermissionsAsync();
+    if (existing.status !== 'granted' && existing.canAskAgain) {
+      await Notifications.requestPermissionsAsync();
+    }
+  } catch {
+    // Non-fatal - login will simply proceed without a push token.
+  }
+}
+
 async function getNativePushToken(): Promise<string | undefined> {
   if (!Device.isDevice) return undefined;
   try {

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, spacing, typography } from '@/theme/theme';
 import { Screen, Card, PrimaryButton } from '@/components/ui';
+import { useOtpBanner } from '@/components/OtpIslandBanner';
 import { useAuth } from '@/auth/AuthContext';
 import { AuthStackParamList } from '@/navigation/types';
 import { ApiError } from '@sptc/shared';
@@ -10,21 +11,43 @@ import { ApiError } from '@sptc/shared';
 type Props = NativeStackScreenProps<AuthStackParamList, 'DeviceVerify'>;
 
 export function DeviceVerifyScreen({ route }: Props) {
-  const { mobile } = route.params;
+  const { mobile, devOtp } = route.params;
   const { verifyDevice } = useAuth();
+  const { showOtp } = useOtpBanner();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
 
-  const onSubmit = async () => {
+  const submit = async (code: string) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     try {
-      await verifyDevice(mobile, otp.trim());
+      await verifyDevice(mobile, code.trim());
     } catch (err) {
       Alert.alert('Incorrect code', err instanceof ApiError ? err.message : 'Please try again.');
+      submittingRef.current = false;
     } finally {
       setLoading(false);
     }
   };
+
+  // Shows on this screen (not the login screen before it), after the
+  // island's own simulated delivery delay - then auto-fills and submits the
+  // code itself, the way iOS auto-fills an OTP from a Messages suggestion.
+  useEffect(() => {
+    if (devOtp) {
+      showOtp(devOtp, {
+        onDelivered: () => {
+          setOtp(devOtp);
+          setTimeout(() => submit(devOtp), 500);
+        },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onSubmit = () => submit(otp);
 
   return (
     <Screen style={styles.container}>

@@ -13,6 +13,7 @@ import {
 } from '@expo-google-fonts/manrope';
 import { LoadingState } from '@/components/ui';
 import { OtpIslandBannerProvider } from '@/components/OtpIslandBanner';
+import { ensureNotificationPermission } from '@/api/device';
 import { AuthProvider } from '@/auth/AuthContext';
 import { RootNavigator } from '@/navigation/RootNavigator';
 
@@ -46,6 +47,12 @@ export default function App() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', onAppStateChange);
     return () => subscription.remove();
+  }, []);
+
+  // Ask for the notification permission right at first launch, rather than
+  // it surfacing for the first time mid-login (see api/device.ts).
+  useEffect(() => {
+    ensureNotificationPermission();
   }, []);
 
   if (!fontsLoaded) {

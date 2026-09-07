@@ -9,7 +9,14 @@ import { colors, radius, spacing, typography } from '@/theme/theme';
 import { Card, ErrorState, LoadingState, PrimaryButton } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
 import { canManageAgreements, canManageCustomersAndLoans } from '@/rbac/uiPermissions';
-import { useDecideLoan, useLoan, useRescheduleInstallment, useUpdateLoanAgreement } from '@/hooks/useApi';
+import {
+  useApplyPenalty,
+  useDecideLoan,
+  useLoan,
+  useNotifyOverdue,
+  useRescheduleInstallment,
+  useUpdateLoanAgreement,
+} from '@/hooks/useApi';
 import { formatDate, formatMoney } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
 import { ApiError, Installment } from '@sptc/shared';
@@ -21,10 +28,13 @@ export function LoanDetailScreen() {
   const decideLoan = useDecideLoan(route.params.loanId);
   const rescheduleInstallment = useRescheduleInstallment(route.params.loanId);
   const updateAgreement = useUpdateLoanAgreement(route.params.loanId);
+  const applyPenalty = useApplyPenalty(route.params.loanId);
+  const notifyOverdue = useNotifyOverdue(route.params.loanId);
   const { identity } = useAuth();
   const [declineReason, setDeclineReason] = useState('');
   const [showDeclineInput, setShowDeclineInput] = useState(false);
   const [reschedulingInstallment, setReschedulingInstallment] = useState<Installment | null>(null);
+  const [penalizingInstallment, setPenalizingInstallment] = useState<Installment | null>(null);
   const [editingAgreement, setEditingAgreement] = useState(false);
   const [agreementDraft, setAgreementDraft] = useState('');
 
@@ -238,11 +248,33 @@ export function LoanDetailScreen() {
                   <Text style={styles.caption}>
                     {installment.status} {Number(installment.paidAmount) > 0 ? `· Paid ${formatMoney(installment.paidAmount)}` : ''}
                   </Text>
+                  {Number(installment.penaltyAmount ?? 0) > 0 ? (
+                    <Text style={styles.penaltyCaption}>Penalty {formatMoney(installment.penaltyAmount!)}</Text>
+                  ) : null}
                 </View>
                 {canReschedule && installment.status !== 'PAID' && installment.status !== 'CANCELLED' ? (
                   <Pressable onPress={() => setReschedulingInstallment(installment)} style={styles.pencilButton}>
                     <Ionicons name="pencil" size={16} color={colors.textSecondary} />
                   </Pressable>
+                ) : null}
+                {canReschedule && installment.status === 'OVERDUE' ? (
+                  <>
+                    <Pressable
+                      onPress={() => {
+                        notifyOverdue.mutate(installment.id, {
+                          onSuccess: () => Alert.alert('Notified', 'A push reminder was sent to the customer.'),
+                          onError: (err) =>
+                            Alert.alert('Could not notify', err instanceof ApiError ? err.message : 'Please try again.'),
+                        });
+                      }}
+                      style={styles.pencilButton}
+                    >
+                      <Ionicons name="notifications-outline" size={16} color={colors.textSecondary} />
+                    </Pressable>
+                    <Pressable onPress={() => setPenalizingInstallment(installment)} style={styles.pencilButton}>
+                      <Ionicons name="add-circle-outline" size={16} color={colors.statusOverdue} />
+                    </Pressable>
+                  </>
                 ) : null}
               </View>
             </View>
@@ -264,7 +296,85 @@ export function LoanDetailScreen() {
           loading={rescheduleInstallment.isPending}
         />
       ) : null}
+
+      {penalizingInstallment ? (
+        <PenaltyModal
+          installment={penalizingInstallment}
+          onClose={() => setPenalizingInstallment(null)}
+          onConfirm={async (amount, reason) => {
+            try {
+              await applyPenalty.mutateAsync({ installmentId: penalizingInstallment.id, amount, reason });
+              setPenalizingInstallment(null);
+            } catch (err) {
+              Alert.alert('Could not add penalty', err instanceof ApiError ? err.message : 'Please try again.');
+            }
+          }}
+          loading={applyPenalty.isPending}
+        />
+      ) : null}
     </ScrollView>
+  );
+}
+
+function PenaltyModal({
+  installment,
+  onClose,
+  onConfirm,
+  loading,
+}: {
+  installment: Installment;
+  onClose: () => void;
+  onConfirm: (amount: number, reason: string) => void;
+  loading: boolean;
+}) {
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const parsedAmount = Number(amount);
+
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Add Penalty · EMI {installment.sequence}</Text>
+          <Text style={styles.caption}>
+            Currently overdue: {formatMoney(new Decimal(installment.totalAmount).minus(installment.paidAmount).toFixed(2))}
+          </Text>
+
+          <Text style={[styles.label, { marginTop: spacing.md }]}>Penalty Amount</Text>
+          <TextInput
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="decimal-pad"
+            style={styles.input}
+            placeholder="e.g. 100"
+            placeholderTextColor={colors.textSecondary}
+          />
+
+          <Text style={[styles.label, { marginTop: spacing.md }]}>Reason</Text>
+          <TextInput
+            value={reason}
+            onChangeText={setReason}
+            style={styles.input}
+            placeholder="e.g. 10 days late payment"
+            placeholderTextColor={colors.textSecondary}
+          />
+
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg }}>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton label="Cancel" onPress={onClose} variant="secondary" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton
+                label="Add Penalty"
+                onPress={() => onConfirm(parsedAmount, reason.trim())}
+                loading={loading}
+                disabled={!(parsedAmount > 0) || !reason.trim()}
+              />
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -347,6 +457,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   loanNumber: { ...typography.h2, color: colors.textPrimary },
   caption: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  penaltyCaption: { ...typography.caption, color: colors.statusOverdue, marginTop: 2 },
   bodyStrong: { ...typography.bodyStrong, color: colors.textPrimary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.lg, gap: spacing.lg },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },

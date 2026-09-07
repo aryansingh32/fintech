@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditActorType, LedgerEntryType, LoanStatus } from '@prisma/client';
+import Decimal from 'decimal.js';
+import { AdjustmentType, AuditActorType, LedgerEntryType, LoanStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LedgerService } from '../ledger/ledger.service';
@@ -11,7 +12,7 @@ import { assertBranchAccess, branchWhereClause } from '../rbac/branch-scope.util
 import { generateLoanNumber, retryOnConflict } from '../common/id-generators';
 import { calculateEmiSchedule, FeeRuleInput } from './emi-calculator';
 import { computeInstallmentStatus } from './installment-status';
-import { CreateLoanDto, ApproveLoanDto, PreviewLoanDto, RescheduleInstallmentDto } from './dto/loan.dto';
+import { CreateLoanDto, ApproveLoanDto, ApplyPenaltyDto, PreviewLoanDto, RescheduleInstallmentDto } from './dto/loan.dto';
 
 @Injectable()
 export class LoansService {
@@ -435,5 +436,118 @@ export class LoansService {
 
     await this.notifications.dispatchAll(notificationIds);
     return updated;
+  }
+
+  /**
+   * Staff-applied late-payment penalty on one overdue (or already-paid-late)
+   * installment. Layers on top of the original schedule - chargesAmount
+   * from origination is never touched - so the frozen agreement snapshot
+   * stays accurate and this is always visible as its own line item via the
+   * Adjustment record and ledger entry.
+   */
+  async applyPenalty(loanId: string, installmentId: string, dto: ApplyPenaltyDto, staff: AuthUser) {
+    const loan = await this.findById(loanId, staff);
+    const installment = loan.installments.find((i) => i.id === installmentId);
+    if (!installment) throw new NotFoundException('Installment not found on this loan.');
+    if (installment.status === 'PAID' || installment.status === 'CANCELLED') {
+      throw new BadRequestException(`Cannot add a penalty to an installment that is already ${installment.status.toLowerCase()}.`);
+    }
+
+    const penaltyAmount = new Decimal(dto.amount).toDecimalPlaces(2);
+
+    const notificationIds: string[] = [];
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updatedInstallment = await tx.installment.update({
+        where: { id: installmentId },
+        data: {
+          penaltyAmount: { increment: penaltyAmount.toFixed(2) },
+          totalAmount: { increment: penaltyAmount.toFixed(2) },
+        },
+      });
+
+      const updatedLoan = await tx.loan.update({
+        where: { id: loanId },
+        data: { totalPayable: { increment: penaltyAmount.toFixed(2) } },
+      });
+
+      await tx.adjustment.create({
+        data: {
+          loanId,
+          type: AdjustmentType.PENALTY,
+          amount: penaltyAmount.toFixed(2),
+          reason: dto.reason,
+          staffId: staff.id,
+        },
+      });
+
+      const freshInstallments = await tx.installment.findMany({ where: { loanId } });
+      await this.ledger.appendEntry(tx, {
+        customerId: loan.customerId,
+        loanId,
+        entryType: LedgerEntryType.FEE,
+        debit: penaltyAmount,
+        balanceAfter: this.ledger.computeOutstanding(updatedLoan, freshInstallments),
+        referenceType: 'Installment',
+        referenceId: installmentId,
+        description: `Late payment penalty on EMI ${installment.sequence}: ${dto.reason}`,
+      });
+
+      await this.audit.record({
+        actorType: AuditActorType.STAFF,
+        actorId: staff.id,
+        role: staff.role,
+        action: 'INSTALLMENT_PENALTY_APPLIED',
+        entityType: 'Installment',
+        entityId: installmentId,
+        afterState: { penaltyAmount: penaltyAmount.toFixed(2) },
+        reason: dto.reason,
+      });
+
+      notificationIds.push(
+        ...(await this.notifications.enqueue(tx, {
+          event: NotificationEvent.PENALTY_APPLIED,
+          customerId: loan.customerId,
+          payload: {
+            amount: penaltyAmount.toFixed(2),
+            sequence: String(installment.sequence),
+            loanNumber: loan.loanNumber,
+          },
+        })),
+      );
+
+      return updatedInstallment;
+    });
+
+    await this.notifications.dispatchAll(notificationIds);
+    return updated;
+  }
+
+  /** Staff-initiated push reminder for one overdue installment, on top of the automatic daily sweep (EmiSchedulerService). */
+  async notifyOverdueInstallment(loanId: string, installmentId: string, staff: AuthUser) {
+    const loan = await this.findById(loanId, staff);
+    const installment = loan.installments.find((i) => i.id === installmentId);
+    if (!installment) throw new NotFoundException('Installment not found on this loan.');
+    if (installment.status !== 'OVERDUE') {
+      throw new BadRequestException('This installment is not overdue.');
+    }
+
+    const outstanding = new Decimal(installment.totalAmount).minus(installment.paidAmount).toDecimalPlaces(2);
+    const ids = await this.notifications.enqueue(this.prisma, {
+      event: NotificationEvent.EMI_OVERDUE,
+      customerId: loan.customerId,
+      payload: { amount: outstanding.toFixed(2), loanNumber: loan.loanNumber },
+    });
+    await this.notifications.dispatchAll(ids);
+
+    await this.audit.record({
+      actorType: AuditActorType.STAFF,
+      actorId: staff.id,
+      role: staff.role,
+      action: 'OVERDUE_NOTIFICATION_SENT',
+      entityType: 'Installment',
+      entityId: installmentId,
+    });
+
+    return { success: true };
   }
 }
