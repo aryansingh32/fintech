@@ -184,6 +184,28 @@ export class NotificationsService {
     });
   }
 
+  /** Marks one IN_APP notification read - scoped to the requesting recipient so one user can never mark another's as read. */
+  async markRead(id: string, recipient: { customerId?: string; staffUserId?: string }) {
+    await this.prisma.notification.updateMany({
+      where: { id, customerId: recipient.customerId, staffUserId: recipient.staffUserId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    return { success: true };
+  }
+
+  async markAllRead(recipient: { customerId?: string; staffUserId?: string }) {
+    await this.prisma.notification.updateMany({
+      where: {
+        customerId: recipient.customerId,
+        staffUserId: recipient.staffUserId,
+        channel: NotificationChannel.IN_APP,
+        readAt: null,
+      },
+      data: { readAt: new Date() },
+    });
+    return { success: true };
+  }
+
   private async markStatus(
     id: string,
     status: NotificationStatus,

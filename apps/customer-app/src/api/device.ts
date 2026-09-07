@@ -35,7 +35,10 @@ async function getOrCreateDeviceIdentifier(): Promise<string> {
  * to yet; that happens in getDeviceInfo() at login time).
  */
 export async function ensureNotificationPermission(): Promise<void> {
-  if (!Device.isDevice) return;
+  // Device.isDevice is false on ALL emulators/simulators, including Android
+  // emulators that have Google Play Services and can get a real, working
+  // FCM token - only iOS simulators are truly incapable of this.
+  if (Platform.OS === 'ios' && !Device.isDevice) return;
   try {
     const existing = await Notifications.getPermissionsAsync();
     if (existing.status !== 'granted' && existing.canAskAgain) {
@@ -47,7 +50,12 @@ export async function ensureNotificationPermission(): Promise<void> {
 }
 
 async function getNativePushToken(): Promise<string | undefined> {
-  if (!Device.isDevice) return undefined;
+  // Device.isDevice is false on ALL emulators/simulators, including Android
+  // emulators that have Google Play Services and can get a real, working
+  // FCM token - only iOS simulators are truly incapable of this (there is
+  // no APNs in the simulator). Skipping unconditionally on isDevice=false
+  // silently broke push notifications for every Android emulator session.
+  if (Platform.OS === 'ios' && !Device.isDevice) return undefined;
   try {
     const existing = await Notifications.getPermissionsAsync();
     let status = existing.status;
@@ -66,7 +74,8 @@ async function getNativePushToken(): Promise<string | undefined> {
 
     const token = await Notifications.getDevicePushTokenAsync();
     return token.data;
-  } catch {
+  } catch (err) {
+    console.warn('[push] Could not obtain a device push token:', err);
     return undefined;
   }
 }

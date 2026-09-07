@@ -7,7 +7,7 @@ import { Card, EmptyState, ErrorState, LoadingState, PrimaryButton } from '@/com
 import { useCreateSupportTicket, useSupportTickets } from '@/hooks/useApi';
 import { formatDate } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
-import { TAB_BAR_CLEARANCE } from '@/navigation/MainTabsNavigator';
+import { TAB_BAR_CLEARANCE } from '@/navigation/tabBarMetrics';
 import { SupportCategory, ApiError } from '@sptc/shared';
 
 const CATEGORIES: SupportCategory[] = [

@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { SubjectType } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -15,5 +15,19 @@ export class NotificationsController {
     return user.subjectType === SubjectType.CUSTOMER
       ? this.notifications.listForCustomer(user.id)
       : this.notifications.listForStaff(user.id);
+  }
+
+  @Post(':id/read')
+  markRead(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.notifications.markRead(id, this.recipientFor(user));
+  }
+
+  @Post('read-all')
+  markAllRead(@CurrentUser() user: AuthUser) {
+    return this.notifications.markAllRead(this.recipientFor(user));
+  }
+
+  private recipientFor(user: AuthUser) {
+    return user.subjectType === SubjectType.CUSTOMER ? { customerId: user.id } : { staffUserId: user.id };
   }
 }

@@ -806,6 +806,10 @@ model Notification {
   retryCount       Int                       @default(0)
   createdAt        DateTime                  @default(now())
   sentAt           DateTime?
+  // Whether the recipient has actually opened/seen this in the app - distinct
+  // from `status` (DELIVERED etc.), which only reflects whether the push/SMS
+  // provider accepted the send, not whether the person looked at it.
+  readAt           DateTime?
 
   @@index([customerId])
   @@index([staffUserId])

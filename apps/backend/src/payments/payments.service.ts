@@ -392,6 +392,23 @@ export class PaymentsService {
       })),
     ];
 
+    // Staff aren't otherwise looking at this loan when a customer pays
+    // through the app themselves (unlike a staff-collected payment, where
+    // the staff member is already the one who just took the money) - let
+    // whoever owns this customer relationship know right away.
+    if (input.source === PaymentSource.CUSTOMER_ONLINE) {
+      const notifyStaffId = loan.approvedByStaffId ?? loan.createdByStaffId;
+      if (notifyStaffId) {
+        notificationIds.push(
+          ...(await this.notifications.enqueue(tx, {
+            event: NotificationEvent.PAYMENT_RECEIVED_STAFF,
+            staffUserId: notifyStaffId,
+            payload: { amount: amount.toFixed(2), loanNumber: loan.loanNumber },
+          })),
+        );
+      }
+    }
+
     return { payment: paymentWithAllocations, receipt, notificationIds };
   }
 

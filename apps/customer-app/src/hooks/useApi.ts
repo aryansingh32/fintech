@@ -43,6 +43,14 @@ export function useNotifications() {
   });
 }
 
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.notifications.markAllRead(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}
+
 export function useKycStatus() {
   return useQuery({
     queryKey: ['kyc', 'me'],

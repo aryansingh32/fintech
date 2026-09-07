@@ -8,7 +8,14 @@ import { colors, spacing, typography } from '@/theme/theme';
 import { BalanceCard, Card, IconTile, PrimaryButton } from '@/components/ui';
 import { StatTile } from '@/components/StatTile';
 import { OfflineBanner } from '@/components/OfflineBanner';
-import { useDailyCollection, useEmiDueToday, useLoanPortfolio, useLoans, useOverdueAging } from '@/hooks/useApi';
+import {
+  useDailyCollection,
+  useEmiDueToday,
+  useLoanPortfolio,
+  useLoans,
+  useNotifications,
+  useOverdueAging,
+} from '@/hooks/useApi';
 import { formatMoney } from '@/utils/format';
 import { useAuth } from '@/auth/AuthContext';
 import { MainTabParamList, RootStackParamList } from '@/navigation/types';
@@ -27,6 +34,8 @@ export function DashboardScreen() {
   const loanPortfolio = useLoanPortfolio();
   const emiDueToday = useEmiDueToday();
   const pendingApprovals = useLoans({ status: LoanStatus.PENDING_APPROVAL });
+  const { data: notifications } = useNotifications();
+  const hasUnreadNotifications = notifications?.some((n) => !n.readAt) ?? false;
 
   const isLoading =
     dailyCollection.isLoading || overdueAging.isLoading || loanPortfolio.isLoading || emiDueToday.isLoading;
@@ -56,9 +65,15 @@ export function DashboardScreen() {
 
       <View style={styles.header}>
         <Text style={styles.title}>Dashboard</Text>
-        <Pressable onPress={() => navigation.navigate('GlobalSearch')}>
-          <IconTile icon="search" size={44} iconSize={20} bg={colors.surfaceMuted} iconColor={colors.textPrimary} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={() => navigation.navigate('Notifications')}>
+            <IconTile icon="notifications" size={44} iconSize={20} bg={colors.surfaceMuted} iconColor={colors.textPrimary} />
+            {hasUnreadNotifications ? <View style={styles.unreadDot} /> : null}
+          </Pressable>
+          <Pressable onPress={() => navigation.navigate('GlobalSearch')}>
+            <IconTile icon="search" size={44} iconSize={20} bg={colors.surfaceMuted} iconColor={colors.textPrimary} />
+          </Pressable>
+        </View>
       </View>
 
       <BalanceCard style={styles.heroCard}>
@@ -110,6 +125,18 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 120 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  headerActions: { flexDirection: 'row', gap: spacing.sm },
+  unreadDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: colors.statusOverdue,
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
   title: { ...typography.h1, color: colors.textPrimary },
   heroCard: { marginBottom: spacing.lg },
   heroLabel: { ...typography.captionStrong, color: colors.accent, letterSpacing: 1 },

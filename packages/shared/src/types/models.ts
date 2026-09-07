@@ -383,6 +383,7 @@ export interface AppNotification {
   payload: Record<string, unknown>;
   createdAt: IsoDateString;
   sentAt?: IsoDateString | null;
+  readAt?: IsoDateString | null;
 }
 
 export interface DeviceSession {

@@ -24,6 +24,7 @@ import { LoanProductsAdminScreen } from '@/screens/settings/LoanProductsAdminScr
 import { AgreementTemplatesAdminScreen } from '@/screens/settings/AgreementTemplatesAdminScreen';
 import { StaffManagementScreen } from '@/screens/settings/StaffManagementScreen';
 import { ReportsTabScreen } from '@/screens/reports/ReportsTabScreen';
+import { NotificationsScreen } from '@/screens/settings/NotificationsScreen';
 import { StaffProfileScreen } from '@/screens/settings/StaffProfileScreen';
 import { SecurityDevicesScreen } from '@/screens/settings/SecurityDevicesScreen';
 
@@ -78,6 +79,7 @@ export function RootNavigator() {
           <Stack.Screen name="AgreementTemplatesAdmin" component={AgreementTemplatesAdminScreen} options={{ title: 'Agreements' }} />
           <Stack.Screen name="StaffManagement" component={StaffManagementScreen} options={{ title: 'Staff & Approvals' }} />
           <Stack.Screen name="Reports" component={ReportsTabScreen} options={{ title: 'Reports' }} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
           <Stack.Screen name="Profile" component={StaffProfileScreen} options={{ title: 'Profile' }} />
           <Stack.Screen name="SecurityDevices" component={SecurityDevicesScreen} options={{ title: 'Active Sessions' }} />
         </Stack.Navigator>

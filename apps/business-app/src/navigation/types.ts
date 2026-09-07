@@ -32,4 +32,5 @@ export type RootStackParamList = {
   StaffManagement: undefined;
   Profile: undefined;
   SecurityDevices: undefined;
+  Notifications: undefined;
 };

@@ -507,3 +507,22 @@ export function useRejectStaffAccount() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['staff'] }),
   });
 }
+
+// ---------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------
+export function useNotifications() {
+  return useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => apiClient.notifications.list(),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.notifications.markAllRead(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}

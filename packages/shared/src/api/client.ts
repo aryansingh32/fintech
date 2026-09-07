@@ -619,5 +619,7 @@ export class ApiClient {
   // ---------------------------------------------------------------------
   notifications = {
     list: () => this.request<AppNotification[]>('GET', '/notifications'),
+    markRead: (id: string) => this.request<{ success: boolean }>('POST', `/notifications/${id}/read`, {}),
+    markAllRead: () => this.request<{ success: boolean }>('POST', '/notifications/read-all', {}),
   };
 }

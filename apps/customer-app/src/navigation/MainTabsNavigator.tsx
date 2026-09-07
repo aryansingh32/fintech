@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, shadow, spacing, typography } from '@/theme/theme';
 import { MainTabParamList } from './types';
+import { BAR_HEIGHT } from './tabBarMetrics';
 import { HomeDashboardScreen } from '@/screens/home/HomeDashboardScreen';
 import { LoanListScreen } from '@/screens/loans/LoanListScreen';
 import { ReceiptHistoryScreen } from '@/screens/receipts/ReceiptHistoryScreen';
@@ -120,10 +121,7 @@ export function MainTabsNavigator() {
   );
 }
 
-const BAR_HEIGHT = 72;
 const PILL_HEIGHT = 48;
-
-export const TAB_BAR_CLEARANCE = BAR_HEIGHT + spacing.xl;
 
 const styles = StyleSheet.create({
   barWrap: {

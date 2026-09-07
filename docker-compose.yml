@@ -40,7 +40,7 @@ services:
       OTP_RESEND_COOLDOWN_SECONDS: "45"
       OTP_MAX_REQUESTS_PER_HOUR: "5"
       SMS_PROVIDER: ""
-      PUSH_PROVIDER: "expo"
+      PUSH_PROVIDER: "fcm"
       PAYMENT_GATEWAY_PROVIDER: ""
       PORT: "3000"
       NODE_ENV: "development"

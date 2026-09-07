@@ -24,6 +24,7 @@ export enum NotificationEvent {
   KYC_VERIFIED = 'KYC_VERIFIED',
   KYC_REJECTED = 'KYC_REJECTED',
   PENALTY_APPLIED = 'PENALTY_APPLIED',
+  PAYMENT_RECEIVED_STAFF = 'PAYMENT_RECEIVED_STAFF',
 }
 
 export type SupportedLocale = 'en' | 'hi';
@@ -139,6 +140,13 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationEvent, NotificationTempl
     body: {
       en: 'Your {{documentType}} has been verified. Your KYC is now complete.',
       hi: 'आपका {{documentType}} सत्यापित हो गया है। आपका KYC अब पूर्ण है।',
+    },
+  },
+  [NotificationEvent.PAYMENT_RECEIVED_STAFF]: {
+    title: { en: 'Online payment received', hi: 'ऑनलाइन भुगतान प्राप्त हुआ' },
+    body: {
+      en: 'A customer paid ₹{{amount}} online for {{loanNumber}}.',
+      hi: 'एक ग्राहक ने {{loanNumber}} के लिए ऑनलाइन ₹{{amount}} का भुगतान किया।',
     },
   },
   [NotificationEvent.PENALTY_APPLIED]: {

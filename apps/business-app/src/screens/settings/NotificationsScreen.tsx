@@ -10,7 +10,7 @@ export function NotificationsScreen() {
   const markAllRead = useMarkAllNotificationsRead();
 
   // Opening this screen is what "seeing" a notification means - clears the
-  // unread dot on the bell icon back on Home.
+  // unread dot on the bell icon back on the Dashboard.
   useEffect(() => {
     markAllRead.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -35,7 +35,6 @@ export function NotificationsScreen() {
             </View>
             <Text style={styles.caption}>{formatDate(item.createdAt)}</Text>
           </View>
-          {typeof item.payload?.title === 'string' ? <Text style={styles.body}>{item.payload.title as string}</Text> : null}
         </Card>
       )}
     />
@@ -58,5 +57,4 @@ const styles = StyleSheet.create({
   unreadDot: { width: 8, height: 8, borderRadius: radius.pill, backgroundColor: colors.statusOverdue },
   title: { ...typography.bodyStrong, color: colors.textPrimary },
   caption: { ...typography.caption, color: colors.textSecondary },
-  body: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
 });

@@ -29,7 +29,7 @@ export function HomeDashboardScreen() {
   }
 
   const activeLoan = loans?.find((l) => l.status === LoanStatus.ACTIVE) ?? loans?.[0];
-  const unreadNotifications = notifications?.filter((n) => n.status !== 'DELIVERED').length ?? 0;
+  const hasUnreadNotifications = notifications?.some((n) => !n.readAt) ?? false;
   const greeting = getGreeting();
 
   return (
@@ -45,11 +45,7 @@ export function HomeDashboardScreen() {
         </View>
         <Pressable onPress={() => navigation.navigate('Notifications')}>
           <IconTile icon="notifications" size={48} iconSize={22} />
-          {unreadNotifications > 0 ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unreadNotifications}</Text>
-            </View>
-          ) : null}
+          {hasUnreadNotifications ? <View style={styles.unreadDot} /> : null}
         </Pressable>
       </View>
 
@@ -171,19 +167,17 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   greeting: { ...typography.body, color: colors.textSecondary },
   name: { ...typography.h1, color: colors.textPrimary },
-  badge: {
+  unreadDot: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 4,
+    top: 2,
+    right: 2,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
     backgroundColor: colors.statusOverdue,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.background,
   },
-  badgeText: { fontSize: 10, fontFamily: 'Manrope_800ExtraBold', color: colors.textInverse },
   loanCard: { marginTop: spacing.lg },
   cardLabel: { ...typography.captionStrong, color: colors.accentStart, letterSpacing: 1 },
   cardLabel2: { ...typography.caption, color: colors.textInverseSecondary, marginTop: spacing.md },
