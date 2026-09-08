@@ -154,10 +154,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pill: {
+    // Absolutely positioned so this stays out of tabButton's normal flex
+    // flow. It used to be a plain (always-rendered, just invisible when
+    // inactive) flex sibling above the icon - that empty 48px-tall box
+    // still took up space and centering the [pill, icon] pair together
+    // pushed the visible icon down off true-center whenever a tab was
+    // inactive, which is what looked "fallen downward" before any tap.
+    position: 'absolute',
+    top: (BAR_HEIGHT - PILL_HEIGHT) / 2,
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'center',
     height: PILL_HEIGHT,
     borderRadius: radius.pill,
     overflow: 'hidden',
