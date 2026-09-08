@@ -7,7 +7,14 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { colors, spacing, typography } from '@/theme/theme';
 import { Card } from '@/components/ui';
 import { useAuth } from '@/auth/AuthContext';
-import { canManageAgreements, canManageBranchesAndStaff, canUseSupport, canViewReports, roleLabel } from '@/rbac/uiPermissions';
+import {
+  canManageAgreements,
+  canManageBranchesAndStaff,
+  canManageCustomersAndLoans,
+  canUseSupport,
+  canViewReports,
+  roleLabel,
+} from '@/rbac/uiPermissions';
 import { MainTabParamList, RootStackParamList } from '@/navigation/types';
 
 type Nav = CompositeNavigationProp<BottomTabNavigationProp<MainTabParamList, 'More'>, NativeStackNavigationProp<RootStackParamList>>;
@@ -30,7 +37,12 @@ export function MoreScreen() {
       ) : null}
       {identity && canViewReports(identity.role) ? <MenuRow label="Reports" onPress={() => navigation.navigate('Reports')} /> : null}
       <MenuRow label="Activity Log" onPress={() => navigation.navigate('AuditLog')} />
-      {identity?.isGlobal ? <MenuRow label="Manage Loan Products" onPress={() => navigation.navigate('LoanProductsAdmin')} /> : null}
+      {identity && canManageCustomersAndLoans(identity.role) ? (
+        <MenuRow label="Manage Loan Products" onPress={() => navigation.navigate('LoanProductsAdmin')} />
+      ) : null}
+      {identity && canManageCustomersAndLoans(identity.role) ? (
+        <MenuRow label="Inventory (Products & IMEI)" onPress={() => navigation.navigate('InventoryProducts')} />
+      ) : null}
       {identity && canManageAgreements(identity.role) ? (
         <MenuRow label="Manage Agreements" onPress={() => navigation.navigate('AgreementTemplatesAdmin')} />
       ) : null}

@@ -169,6 +169,7 @@ export interface Product {
   financePrice: Money;
   warrantyMonths?: number | null;
   isActive: boolean;
+  identifiers?: ProductIdentifier[];
 }
 
 export interface ProductIdentifier {

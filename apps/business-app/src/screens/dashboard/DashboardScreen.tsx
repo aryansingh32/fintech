@@ -8,6 +8,7 @@ import { colors, spacing, typography } from '@/theme/theme';
 import { BalanceCard, Card, IconTile, PrimaryButton } from '@/components/ui';
 import { StatTile } from '@/components/StatTile';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { canManageCustomersAndLoans } from '@/rbac/uiPermissions';
 import {
   useDailyCollection,
   useEmiDueToday,
@@ -112,7 +113,7 @@ export function DashboardScreen() {
         </View>
       </View>
 
-      {identity?.isGlobal ? (
+      {identity && canManageCustomersAndLoans(identity.role) ? (
         <View style={{ marginTop: spacing.lg }}>
           <PrimaryButton label="Manage Loan Products" icon="settings" onPress={() => navigation.navigate('LoanProductsAdmin')} variant="secondary" />
         </View>

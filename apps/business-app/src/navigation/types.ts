@@ -28,6 +28,7 @@ export type RootStackParamList = {
   SupportChat: { ticketId: string };
   Reports: undefined;
   LoanProductsAdmin: undefined;
+  InventoryProducts: undefined;
   AgreementTemplatesAdmin: undefined;
   StaffManagement: undefined;
   Profile: undefined;
