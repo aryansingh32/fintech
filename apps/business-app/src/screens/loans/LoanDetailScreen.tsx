@@ -248,56 +248,73 @@ export function LoanDetailScreen() {
       <Card style={{ padding: 0 }}>
         {[...loan.installments]
           .sort((a, b) => a.sequence - b.sequence)
-          .map((installment, index) => (
-            <View key={installment.id} style={[styles.installmentRow, index > 0 && styles.installmentRowBorder]}>
-              <View>
-                <Text style={styles.bodyStrong}>EMI {installment.sequence}</Text>
-                <Text style={styles.caption}>Due: {formatDate(installment.dueDate)}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ alignItems: 'flex-end', marginRight: spacing.sm }}>
-                  <Text style={styles.bodyStrong}>{formatMoney(installment.totalAmount)}</Text>
-                  <Text style={[styles.caption, isPastDue(installment) && styles.penaltyCaption]}>
-                    {installment.status}
-                    {installment.status !== 'OVERDUE' && isPastDue(installment) ? ' · Overdue' : ''}
-                    {Number(installment.paidAmount) > 0 ? ` · Paid ${formatMoney(installment.paidAmount)}` : ''}
-                  </Text>
-                  {Number(installment.penaltyAmount ?? 0) > 0 ? (
-                    <Text style={styles.penaltyCaption}>Penalty {formatMoney(installment.penaltyAmount!)}</Text>
-                  ) : null}
+          .map((installment, index) => {
+            const overdue = isPastDue(installment);
+            const hasPenalty = Number(installment.penaltyAmount ?? 0) > 0;
+            const canAct = canReschedule && installment.status !== 'CANCELLED';
+            const showActions = canAct && (installment.status !== 'PAID' || hasPenalty);
+            return (
+              <View key={installment.id} style={[styles.installmentRow, index > 0 && styles.installmentRowBorder]}>
+                <View style={styles.installmentTopRow}>
+                  <View>
+                    <Text style={styles.bodyStrong}>EMI {installment.sequence}</Text>
+                    <Text style={styles.caption}>Due: {formatDate(installment.dueDate)}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.bodyStrong}>{formatMoney(installment.totalAmount)}</Text>
+                    <Text style={[styles.caption, overdue && styles.penaltyCaption]}>
+                      {installment.status}
+                      {installment.status !== 'OVERDUE' && overdue ? ' · Overdue' : ''}
+                      {Number(installment.paidAmount) > 0 ? ` · Paid ${formatMoney(installment.paidAmount)}` : ''}
+                    </Text>
+                    {hasPenalty ? <Text style={styles.penaltyCaption}>Penalty {formatMoney(installment.penaltyAmount!)}</Text> : null}
+                  </View>
                 </View>
-                {canReschedule && installment.status !== 'PAID' && installment.status !== 'CANCELLED' ? (
-                  <Pressable onPress={() => setReschedulingInstallment(installment)} style={styles.pencilButton}>
-                    <Ionicons name="pencil" size={16} color={colors.textSecondary} />
-                  </Pressable>
-                ) : null}
-                {canReschedule && isPastDue(installment) ? (
-                  <>
-                    <Pressable
-                      onPress={() => {
-                        notifyOverdue.mutate(installment.id, {
-                          onSuccess: () => Alert.alert('Notified', 'A push reminder was sent to the customer.'),
-                          onError: (err) =>
-                            Alert.alert('Could not notify', err instanceof ApiError ? err.message : 'Please try again.'),
-                        });
-                      }}
-                      style={styles.pencilButton}
-                    >
-                      <Ionicons name="notifications-outline" size={16} color={colors.textSecondary} />
-                    </Pressable>
-                    <Pressable onPress={() => setPenalizingInstallment(installment)} style={styles.pencilButton}>
-                      <Ionicons name="add-circle-outline" size={16} color={colors.statusOverdue} />
-                    </Pressable>
-                  </>
-                ) : null}
-                {canReschedule && Number(installment.penaltyAmount ?? 0) > 0 && installment.status !== 'CANCELLED' ? (
-                  <Pressable onPress={() => setRevokingInstallment(installment)} style={styles.pencilButton}>
-                    <Ionicons name="close-circle-outline" size={16} color={colors.statusOverdue} />
-                  </Pressable>
+                {showActions ? (
+                  <View style={styles.installmentActionsRow}>
+                    {installment.status !== 'PAID' ? (
+                      <Pressable
+                        onPress={() => setReschedulingInstallment(installment)}
+                        style={styles.actionButton}
+                        hitSlop={6}
+                      >
+                        <Ionicons name="pencil" size={16} color={colors.textSecondary} />
+                        <Text style={styles.actionLabel}>Reschedule</Text>
+                      </Pressable>
+                    ) : null}
+                    {overdue ? (
+                      <Pressable
+                        onPress={() => {
+                          notifyOverdue.mutate(installment.id, {
+                            onSuccess: () => Alert.alert('Notified', 'A push reminder was sent to the customer.'),
+                            onError: (err) =>
+                              Alert.alert('Could not notify', err instanceof ApiError ? err.message : 'Please try again.'),
+                          });
+                        }}
+                        style={styles.actionButton}
+                        hitSlop={6}
+                      >
+                        <Ionicons name="notifications-outline" size={16} color={colors.textSecondary} />
+                        <Text style={styles.actionLabel}>Notify</Text>
+                      </Pressable>
+                    ) : null}
+                    {overdue ? (
+                      <Pressable onPress={() => setPenalizingInstallment(installment)} style={styles.actionButton} hitSlop={6}>
+                        <Ionicons name="add-circle-outline" size={16} color={colors.statusOverdue} />
+                        <Text style={[styles.actionLabel, styles.penaltyCaption]}>Add Penalty</Text>
+                      </Pressable>
+                    ) : null}
+                    {hasPenalty ? (
+                      <Pressable onPress={() => setRevokingInstallment(installment)} style={styles.actionButton} hitSlop={6}>
+                        <Ionicons name="close-circle-outline" size={16} color={colors.statusOverdue} />
+                        <Text style={[styles.actionLabel, styles.penaltyCaption]}>Remove Penalty</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
-            </View>
-          ))}
+            );
+          })}
       </Card>
 
       {reschedulingInstallment ? (
@@ -432,8 +449,9 @@ function RevokePenaltyModal({
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>Remove Penalty · EMI {installment.sequence}</Text>
           <Text style={styles.caption}>
-            Current penalty on this EMI: {formatMoney(installment.penaltyAmount ?? 0)}. Only the unpaid portion of it
-            will be removed - if the customer already paid some of it, that part stays on the record.
+            Current penalty on this EMI: {formatMoney(installment.penaltyAmount ?? 0)}. This removes the charge
+            entirely. If the customer already paid some or all of it, that money is credited toward this EMI (or the
+            next one) instead of being refunded.
           </Text>
 
           <Text style={[styles.label, { marginTop: spacing.md }]}>Reason (required)</Text>
@@ -556,9 +574,26 @@ const styles = StyleSheet.create({
   decisionBlock: { marginTop: spacing.lg },
   sectionTitle: { ...typography.h2, color: colors.textPrimary, marginTop: spacing.xl, marginBottom: spacing.md },
   hint: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.md },
-  installmentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg },
+  installmentRow: { padding: spacing.lg },
   installmentRowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
-  pencilButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
+  installmentTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  installmentActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceMuted,
+  },
+  actionLabel: { ...typography.caption, color: colors.textSecondary },
   label: { ...typography.captionStrong, color: colors.textSecondary, marginBottom: spacing.sm },
   input: {
     borderWidth: 1,

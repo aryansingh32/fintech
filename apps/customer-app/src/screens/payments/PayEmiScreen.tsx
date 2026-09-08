@@ -93,7 +93,6 @@ export function PayEmiScreen() {
   if (error) {
     return (
       <View style={[styles.screen, styles.centered]}>
-        <Text style={styles.errorTitle}>Something went wrong</Text>
         <Text style={styles.errorMessage}>{error}</Text>
         <Text style={[styles.errorMessage, { marginTop: spacing.md }]}>
           Please contact {SHOP_NAME}, or call to pay your EMI:
@@ -175,8 +174,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   centered: { alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  errorTitle: { ...typography.h2, color: colors.statusFailed, textAlign: 'center' },
-  errorMessage: { ...typography.caption, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
+  errorMessage: { ...typography.body, color: colors.textPrimary, textAlign: 'center' },
   phoneLink: { ...typography.bodyStrong, color: colors.brand, marginTop: spacing.sm, textDecorationLine: 'underline' },
   label: { ...typography.captionStrong, color: colors.textSecondary },
   amountRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
