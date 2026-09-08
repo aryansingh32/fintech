@@ -162,6 +162,7 @@ export interface Product {
   id: string;
   brand: string;
   model: string;
+  specs?: string | null;
   category: string;
   sku: string;
   purchasePrice: Money;

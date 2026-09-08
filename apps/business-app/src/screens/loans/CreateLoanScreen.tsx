@@ -4,7 +4,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, radius, spacing, typography } from '@/theme/theme';
 import { Card, PrimaryButton } from '@/components/ui';
-import { useCreateLoan, useIdentifierSearch, useLoanPreview, useLoanProducts } from '@/hooks/useApi';
+import { useAddIdentifier, useCreateLoan, useCreateProduct, useIdentifierSearch, useLoanPreview, useLoanProducts } from '@/hooks/useApi';
 import { formatDate, formatMoney } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
 import { ApiError } from '@sptc/shared';
@@ -28,7 +28,19 @@ export function CreateLoanScreen() {
   const [versionId, setVersionId] = useState<string | undefined>();
   const [imeiQuery, setImeiQuery] = useState('');
   const [productIdentifierId, setProductIdentifierId] = useState<string | undefined>();
+  const [selectedDeviceLabel, setSelectedDeviceLabel] = useState<string | undefined>();
   const identifiers = useIdentifierSearch(imeiQuery);
+
+  const [showNewDeviceForm, setShowNewDeviceForm] = useState(false);
+  const [newBrand, setNewBrand] = useState('');
+  const [newModel, setNewModel] = useState('');
+  const [newSpecs, setNewSpecs] = useState('');
+  const [newImei1, setNewImei1] = useState('');
+  const [newImei2, setNewImei2] = useState('');
+  const [newSerial, setNewSerial] = useState('');
+  const createProduct = useCreateProduct();
+  const addIdentifier = useAddIdentifier();
+  const [savingDevice, setSavingDevice] = useState(false);
 
   const [cashPrice, setCashPrice] = useState('');
   const [downPayment, setDownPayment] = useState('0');
@@ -45,6 +57,46 @@ export function CreateLoanScreen() {
     numberOfInstallments: Number(installments) || 0,
     manualInterestAmount,
   });
+
+  const onSaveNewDevice = async () => {
+    setSavingDevice(true);
+    try {
+      const product = await createProduct.mutateAsync({
+        brand: newBrand.trim(),
+        model: newModel.trim(),
+        specs: newSpecs.trim() || undefined,
+        financePrice: Number(cashPrice) || undefined,
+      });
+
+      if (newImei1.trim() || newImei2.trim() || newSerial.trim()) {
+        const identifier = await addIdentifier.mutateAsync({
+          productId: product.id,
+          dto: {
+            imei1: newImei1.trim() || undefined,
+            imei2: newImei2.trim() || undefined,
+            serialNumber: newSerial.trim() || undefined,
+          },
+        });
+        setProductIdentifierId(identifier.id);
+        setSelectedDeviceLabel(`${newBrand.trim()} ${newModel.trim()} · ${newImei1.trim() || newSerial.trim()}`);
+      } else {
+        setSelectedDeviceLabel(`${newBrand.trim()} ${newModel.trim()}`);
+      }
+
+      setImeiQuery('');
+      setNewBrand('');
+      setNewModel('');
+      setNewSpecs('');
+      setNewImei1('');
+      setNewImei2('');
+      setNewSerial('');
+      setShowNewDeviceForm(false);
+    } catch (err) {
+      Alert.alert('Could not save device', err instanceof ApiError ? err.message : 'Please check the details and try again.');
+    } finally {
+      setSavingDevice(false);
+    }
+  };
 
   const onSubmit = async () => {
     if (!versionId) {
@@ -105,7 +157,10 @@ export function CreateLoanScreen() {
         {identifiers.data?.map((identifier) => (
           <Pressable
             key={identifier.id}
-            onPress={() => setProductIdentifierId(identifier.id)}
+            onPress={() => {
+              setProductIdentifierId(identifier.id);
+              setSelectedDeviceLabel(undefined);
+            }}
             style={[styles.identifierRow, productIdentifierId === identifier.id && styles.identifierRowSelected]}
           >
             <Text style={styles.body}>
@@ -114,6 +169,95 @@ export function CreateLoanScreen() {
             <Text style={styles.caption}>{identifier.status}</Text>
           </Pressable>
         ))}
+
+        {selectedDeviceLabel ? (
+          <View style={[styles.identifierRow, styles.identifierRowSelected]}>
+            <Text style={styles.body}>{selectedDeviceLabel}</Text>
+            <Text style={styles.caption}>New device</Text>
+          </View>
+        ) : null}
+
+        {!showNewDeviceForm ? (
+          <Pressable onPress={() => setShowNewDeviceForm(true)} style={{ marginTop: spacing.md }}>
+            <Text style={styles.linkText}>+ Can't find it? Register a new device</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.newDeviceForm}>
+            <Text style={styles.label}>Product Details (optional)</Text>
+            <TextInput
+              value={newBrand}
+              onChangeText={setNewBrand}
+              placeholder="Brand (e.g. Samsung)"
+              placeholderTextColor={colors.textSecondary}
+              style={styles.input}
+            />
+            <TextInput
+              value={newModel}
+              onChangeText={setNewModel}
+              placeholder="Model / Name (e.g. Galaxy A15)"
+              placeholderTextColor={colors.textSecondary}
+              style={[styles.input, { marginTop: spacing.sm }]}
+            />
+            <TextInput
+              value={newSpecs}
+              onChangeText={setNewSpecs}
+              placeholder="Specs (e.g. 128GB, 6GB RAM, Blue) - optional"
+              placeholderTextColor={colors.textSecondary}
+              style={[styles.input, { marginTop: spacing.sm }]}
+              multiline
+            />
+            <View style={styles.rowInputs}>
+              <TextInput
+                value={newImei1}
+                onChangeText={setNewImei1}
+                placeholder="IMEI 1"
+                keyboardType="number-pad"
+                placeholderTextColor={colors.textSecondary}
+                style={[styles.input, styles.rowInput]}
+              />
+              <TextInput
+                value={newImei2}
+                onChangeText={setNewImei2}
+                placeholder="IMEI 2 (optional)"
+                keyboardType="number-pad"
+                placeholderTextColor={colors.textSecondary}
+                style={[styles.input, styles.rowInput]}
+              />
+            </View>
+            <TextInput
+              value={newSerial}
+              onChangeText={setNewSerial}
+              placeholder="Serial Number (optional)"
+              placeholderTextColor={colors.textSecondary}
+              style={[styles.input, { marginTop: spacing.sm }]}
+            />
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <PrimaryButton
+                  label="Cancel"
+                  variant="secondary"
+                  onPress={() => {
+                    setShowNewDeviceForm(false);
+                    setNewBrand('');
+                    setNewModel('');
+                    setNewSpecs('');
+                    setNewImei1('');
+                    setNewImei2('');
+                    setNewSerial('');
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <PrimaryButton
+                  label="Save Device"
+                  onPress={onSaveNewDevice}
+                  loading={savingDevice}
+                  disabled={!newBrand.trim() || !newModel.trim()}
+                />
+              </View>
+            </View>
+          </View>
+        )}
       </Card>
 
       <Card style={{ marginTop: spacing.lg }}>
@@ -202,6 +346,10 @@ const styles = StyleSheet.create({
   },
   identifierRow: { padding: spacing.sm, borderRadius: radius.sm, marginTop: spacing.sm },
   identifierRowSelected: { backgroundColor: colors.brandSoft },
+  linkText: { ...typography.captionStrong, color: colors.brand },
+  newDeviceForm: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  rowInputs: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  rowInput: { flex: 1 },
   previewTitle: { ...typography.bodyStrong, color: colors.textPrimary, marginBottom: spacing.sm },
   previewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
   previewItem: { width: '42%' },

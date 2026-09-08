@@ -328,11 +328,12 @@ export class ApiClient {
     create: (dto: {
       brand: string;
       model: string;
-      category: string;
-      sku: string;
-      purchasePrice: number;
-      sellingPrice: number;
-      financePrice: number;
+      specs?: string;
+      category?: string;
+      sku?: string;
+      purchasePrice?: number;
+      sellingPrice?: number;
+      financePrice?: number;
       warrantyMonths?: number;
     }) => this.request<Product>('POST', '/products', dto),
     list: () => this.request<Product[]>('GET', '/products'),

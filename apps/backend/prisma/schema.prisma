@@ -326,6 +326,7 @@ model Product {
   branch         Branch?  @relation(fields: [branchId], references: [id])
   brand          String
   model          String
+  specs          String?
   category       String
   sku            String   @unique
   purchasePrice  Decimal  @db.Decimal(14, 2)

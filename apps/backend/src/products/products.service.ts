@@ -8,9 +8,26 @@ import { CreateProductDto, CreateProductIdentifierDto } from './dto/product.dto'
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * category/sku/prices are optional here so a device can be added inline
+   * during loan creation (staff just types brand/model/specs) without also
+   * filling out the full catalog form used on the Inventory screen.
+   */
   create(dto: CreateProductDto, staff: AuthUser) {
+    const price = dto.financePrice ?? dto.sellingPrice ?? dto.purchasePrice ?? 0;
     return this.prisma.product.create({
-      data: { ...dto, branchId: staff.branchId ?? undefined },
+      data: {
+        brand: dto.brand,
+        model: dto.model,
+        specs: dto.specs,
+        category: dto.category?.trim() || 'Device',
+        sku: dto.sku?.trim() || `AUTO-${Date.now().toString(36).toUpperCase()}`,
+        purchasePrice: dto.purchasePrice ?? price,
+        sellingPrice: dto.sellingPrice ?? price,
+        financePrice: dto.financePrice ?? price,
+        warrantyMonths: dto.warrantyMonths,
+        branchId: staff.branchId ?? undefined,
+      },
     });
   }
 

@@ -7,23 +7,32 @@ export class CreateProductDto {
   @IsString()
   model: string;
 
+  @IsOptional()
   @IsString()
-  category: string;
+  specs?: string;
 
+  @IsOptional()
   @IsString()
-  sku: string;
+  category?: string;
 
+  @IsOptional()
+  @IsString()
+  sku?: string;
+
+  @IsOptional()
   @IsNumber()
   @IsPositive()
-  purchasePrice: number;
+  purchasePrice?: number;
 
+  @IsOptional()
   @IsNumber()
   @IsPositive()
-  sellingPrice: number;
+  sellingPrice?: number;
 
+  @IsOptional()
   @IsNumber()
   @IsPositive()
-  financePrice: number;
+  financePrice?: number;
 
   @IsOptional()
   @IsNumber()
