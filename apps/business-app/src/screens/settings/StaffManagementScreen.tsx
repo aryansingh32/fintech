@@ -231,10 +231,12 @@ function StaffRow({
         <View style={{ marginTop: spacing.md }}>
           <PrimaryButton label="Restore Access" onPress={onReactivate ?? (() => {})} variant="secondary" />
         </View>
-      ) : !isSelf ? (
+      ) : !isSelf && staff.role !== 'SUPER_ADMIN' ? (
         <View style={{ marginTop: spacing.md }}>
           <PrimaryButton label="Revoke Access" onPress={onRevoke ?? (() => {})} variant="danger" />
         </View>
+      ) : staff.role === 'SUPER_ADMIN' ? (
+        <Text style={[styles.caption, { marginTop: spacing.sm }]}>Super Admin access is permanent and cannot be revoked.</Text>
       ) : null}
     </Card>
   );

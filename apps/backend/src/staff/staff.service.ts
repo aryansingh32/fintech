@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { AuditActorType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -40,6 +40,13 @@ export class StaffService {
   }
 
   async create(dto: CreateStaffDto, actor: AuthUser) {
+    // SUPER_ADMIN accounts are never created through this self-service
+    // endpoint - every staff role can reach it (full data/function parity),
+    // so allowing SUPER_ADMIN here would let anyone mint themselves one.
+    if (dto.role === 'SUPER_ADMIN') {
+      throw new ForbiddenException('A Super Admin account cannot be created here. Contact SPTC Finance directly.');
+    }
+
     const existing = await this.prisma.staffUser.findUnique({ where: { mobile: dto.mobile } });
     if (existing) throw new ConflictException('A staff account with this mobile number already exists.');
 
@@ -103,6 +110,18 @@ export class StaffService {
   async reject(staffId: string, reason: string | undefined, actor: AuthUser) {
     const staff = await this.prisma.staffUser.findUnique({ where: { id: staffId } });
     if (!staff) throw new NotFoundException('Staff account not found.');
+
+    // A SUPER_ADMIN account is permanent - it must never be revocable by
+    // anyone (including another SUPER_ADMIN), since every role now has full
+    // staff-management access and losing the last SUPER_ADMIN would leave
+    // no one able to restore it. Also block self-revocation for every role,
+    // so no one can accidentally lock themselves out.
+    if (staff.role === 'SUPER_ADMIN') {
+      throw new ForbiddenException('A Super Admin account is permanent and cannot be revoked or rejected.');
+    }
+    if (staff.id === actor.id) {
+      throw new ForbiddenException('You cannot revoke your own access.');
+    }
 
     const updated = await this.prisma.staffUser.update({
       where: { id: staffId },
