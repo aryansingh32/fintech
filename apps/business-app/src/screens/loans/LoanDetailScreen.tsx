@@ -15,6 +15,7 @@ import {
   useLoan,
   useNotifyOverdue,
   useRescheduleInstallment,
+  useRevokePenalty,
   useUpdateLoanAgreement,
 } from '@/hooks/useApi';
 import { formatDate, formatMoney } from '@/utils/format';
@@ -29,12 +30,14 @@ export function LoanDetailScreen() {
   const rescheduleInstallment = useRescheduleInstallment(route.params.loanId);
   const updateAgreement = useUpdateLoanAgreement(route.params.loanId);
   const applyPenalty = useApplyPenalty(route.params.loanId);
+  const revokePenalty = useRevokePenalty(route.params.loanId);
   const notifyOverdue = useNotifyOverdue(route.params.loanId);
   const { identity } = useAuth();
   const [declineReason, setDeclineReason] = useState('');
   const [showDeclineInput, setShowDeclineInput] = useState(false);
   const [reschedulingInstallment, setReschedulingInstallment] = useState<Installment | null>(null);
   const [penalizingInstallment, setPenalizingInstallment] = useState<Installment | null>(null);
+  const [revokingInstallment, setRevokingInstallment] = useState<Installment | null>(null);
   const [editingAgreement, setEditingAgreement] = useState(false);
   const [agreementDraft, setAgreementDraft] = useState('');
 
@@ -276,6 +279,11 @@ export function LoanDetailScreen() {
                     </Pressable>
                   </>
                 ) : null}
+                {canReschedule && Number(installment.penaltyAmount ?? 0) > 0 && installment.status !== 'CANCELLED' ? (
+                  <Pressable onPress={() => setRevokingInstallment(installment)} style={styles.pencilButton}>
+                    <Ionicons name="close-circle-outline" size={16} color={colors.statusOverdue} />
+                  </Pressable>
+                ) : null}
               </View>
             </View>
           ))}
@@ -310,6 +318,22 @@ export function LoanDetailScreen() {
             }
           }}
           loading={applyPenalty.isPending}
+        />
+      ) : null}
+
+      {revokingInstallment ? (
+        <RevokePenaltyModal
+          installment={revokingInstallment}
+          onClose={() => setRevokingInstallment(null)}
+          onConfirm={async (reason) => {
+            try {
+              await revokePenalty.mutateAsync({ installmentId: revokingInstallment.id, reason });
+              setRevokingInstallment(null);
+            } catch (err) {
+              Alert.alert('Could not remove penalty', err instanceof ApiError ? err.message : 'Please try again.');
+            }
+          }}
+          loading={revokePenalty.isPending}
         />
       ) : null}
     </ScrollView>
@@ -369,6 +393,58 @@ function PenaltyModal({
                 onPress={() => onConfirm(parsedAmount, reason.trim())}
                 loading={loading}
                 disabled={!(parsedAmount > 0) || !reason.trim()}
+              />
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function RevokePenaltyModal({
+  installment,
+  onClose,
+  onConfirm,
+  loading,
+}: {
+  installment: Installment;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+  loading: boolean;
+}) {
+  const [reason, setReason] = useState('');
+
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Remove Penalty · EMI {installment.sequence}</Text>
+          <Text style={styles.caption}>
+            Current penalty on this EMI: {formatMoney(installment.penaltyAmount ?? 0)}. Only the unpaid portion of it
+            will be removed - if the customer already paid some of it, that part stays on the record.
+          </Text>
+
+          <Text style={[styles.label, { marginTop: spacing.md }]}>Reason (required)</Text>
+          <TextInput
+            value={reason}
+            onChangeText={setReason}
+            style={styles.input}
+            placeholder="e.g. customer had a valid reason for the delay"
+            placeholderTextColor={colors.textSecondary}
+          />
+
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg }}>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton label="Cancel" onPress={onClose} variant="secondary" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton
+                label="Remove Penalty"
+                onPress={() => onConfirm(reason.trim())}
+                variant="danger"
+                loading={loading}
+                disabled={!reason.trim()}
               />
             </View>
           </View>

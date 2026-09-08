@@ -222,6 +222,15 @@ export function useApplyPenalty(loanId: string) {
   });
 }
 
+export function useRevokePenalty(loanId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ installmentId, reason }: { installmentId: string; reason: string }) =>
+      apiClient.loans.revokePenalty(loanId, installmentId, reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loans', 'detail', loanId] }),
+  });
+}
+
 export function useNotifyOverdue(loanId: string) {
   return useMutation({
     mutationFn: (installmentId: string) => apiClient.loans.notifyOverdue(loanId, installmentId),

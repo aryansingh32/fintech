@@ -83,6 +83,11 @@ export class ApplyPenaltyDto {
   reason: string;
 }
 
+export class RevokePenaltyDto {
+  @IsString()
+  reason: string;
+}
+
 export class ApproveLoanDto {
   @IsIn(['APPROVED', 'DECLINED', 'MANUAL_REVIEW'])
   decision: 'APPROVED' | 'DECLINED' | 'MANUAL_REVIEW';

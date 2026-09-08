@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import Decimal from 'decimal.js';
-import { AdjustmentType, AuditActorType, LedgerEntryType, LoanStatus } from '@prisma/client';
+import { AdjustmentType, AllocationComponent, AuditActorType, LedgerEntryType, LoanStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LedgerService } from '../ledger/ledger.service';
@@ -12,7 +12,7 @@ import { assertBranchAccess, branchWhereClause } from '../rbac/branch-scope.util
 import { generateLoanNumber, retryOnConflict } from '../common/id-generators';
 import { calculateEmiSchedule, FeeRuleInput } from './emi-calculator';
 import { computeInstallmentStatus } from './installment-status';
-import { CreateLoanDto, ApproveLoanDto, ApplyPenaltyDto, PreviewLoanDto, RescheduleInstallmentDto } from './dto/loan.dto';
+import { CreateLoanDto, ApproveLoanDto, ApplyPenaltyDto, PreviewLoanDto, RescheduleInstallmentDto, RevokePenaltyDto } from './dto/loan.dto';
 
 @Injectable()
 export class LoansService {
@@ -516,6 +516,119 @@ export class LoansService {
       );
 
       return updatedInstallment;
+    });
+
+    await this.notifications.dispatchAll(notificationIds);
+    return updated;
+  }
+
+  /**
+   * Waives whatever portion of a penalty (applied above via `applyPenalty`)
+   * is still unpaid. Money already collected against it is left alone -
+   * undoing a penalty a customer already paid is a payment reversal
+   * (PaymentsService.reversePayment), not a waiver of a charge that no
+   * longer exists.
+   */
+  async revokePenalty(loanId: string, installmentId: string, dto: RevokePenaltyDto, staff: AuthUser) {
+    const loan = await this.findById(loanId, staff);
+    const installment = loan.installments.find((i) => i.id === installmentId);
+    if (!installment) throw new NotFoundException('Installment not found on this loan.');
+
+    const currentPenalty = new Decimal(installment.penaltyAmount);
+    if (currentPenalty.lte(0)) {
+      throw new BadRequestException('This installment has no penalty to remove.');
+    }
+
+    const paidPenalty = await this.prisma.paymentAllocation.aggregate({
+      where: {
+        installmentId,
+        component: AllocationComponent.OVERDUE_PENALTY,
+        payment: { status: PaymentStatus.SUCCESSFUL },
+      },
+      _sum: { amount: true },
+    });
+    const alreadyPaid = new Decimal(paidPenalty._sum.amount ?? 0);
+    const removable = currentPenalty.minus(alreadyPaid).toDecimalPlaces(2);
+
+    if (removable.lte(0)) {
+      throw new BadRequestException(
+        'This penalty has already been fully paid and cannot be removed. Reverse the payment instead if you need to undo it.',
+      );
+    }
+
+    const notificationIds: string[] = [];
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.installment.update({
+        where: { id: installmentId },
+        data: {
+          penaltyAmount: { decrement: removable.toFixed(2) },
+          totalAmount: { decrement: removable.toFixed(2) },
+        },
+      });
+
+      const updatedLoan = await tx.loan.update({
+        where: { id: loanId },
+        data: { totalPayable: { decrement: removable.toFixed(2) } },
+      });
+
+      const refreshedInstallment = await tx.installment.findUniqueOrThrow({ where: { id: installmentId } });
+      const recomputedStatus = computeInstallmentStatus(
+        refreshedInstallment.totalAmount,
+        refreshedInstallment.paidAmount,
+        refreshedInstallment.dueDate,
+      );
+      const finalInstallment =
+        recomputedStatus === refreshedInstallment.status
+          ? refreshedInstallment
+          : await tx.installment.update({ where: { id: installmentId }, data: { status: recomputedStatus } });
+
+      await tx.adjustment.create({
+        data: {
+          loanId,
+          type: AdjustmentType.WAIVER,
+          amount: removable.toFixed(2),
+          reason: dto.reason,
+          staffId: staff.id,
+        },
+      });
+
+      const freshInstallments = await tx.installment.findMany({ where: { loanId } });
+      await this.ledger.appendEntry(tx, {
+        customerId: loan.customerId,
+        loanId,
+        entryType: LedgerEntryType.WAIVER,
+        credit: removable,
+        balanceAfter: this.ledger.computeOutstanding(updatedLoan, freshInstallments),
+        referenceType: 'Installment',
+        referenceId: installmentId,
+        description: `Penalty removed on EMI ${installment.sequence}: ${dto.reason}`,
+      });
+
+      await this.audit.record({
+        actorType: AuditActorType.STAFF,
+        actorId: staff.id,
+        role: staff.role,
+        action: 'INSTALLMENT_PENALTY_REVOKED',
+        entityType: 'Installment',
+        entityId: installmentId,
+        beforeState: { penaltyAmount: currentPenalty.toFixed(2) },
+        afterState: { penaltyAmount: finalInstallment.penaltyAmount.toFixed(2) },
+        reason: dto.reason,
+      });
+
+      notificationIds.push(
+        ...(await this.notifications.enqueue(tx, {
+          event: NotificationEvent.PENALTY_REVOKED,
+          customerId: loan.customerId,
+          payload: {
+            amount: removable.toFixed(2),
+            sequence: String(installment.sequence),
+            loanNumber: loan.loanNumber,
+          },
+        })),
+      );
+
+      return finalInstallment;
     });
 
     await this.notifications.dispatchAll(notificationIds);

@@ -28,6 +28,7 @@ describe('computeSuggestedAllocation', () => {
           isOverdue: false,
           remainingPrincipal: D(2500),
           remainingCharges: D(750),
+          remainingPenalty: D(0),
         },
       ],
     });
@@ -54,6 +55,7 @@ describe('computeSuggestedAllocation', () => {
           isOverdue: false,
           remainingPrincipal: D(1000),
           remainingCharges: D(0),
+          remainingPenalty: D(0),
         },
         {
           installmentId: 'overdue',
@@ -62,6 +64,7 @@ describe('computeSuggestedAllocation', () => {
           isOverdue: true,
           remainingPrincipal: D(1000),
           remainingCharges: D(0),
+          remainingPenalty: D(0),
         },
       ],
     });
@@ -84,6 +87,42 @@ describe('computeSuggestedAllocation', () => {
     expect(() => computeSuggestedAllocation(0, state())).toThrow(AllocationError);
     expect(() => computeSuggestedAllocation(-10, state())).toThrow(AllocationError);
   });
+
+  it('allocates a staff-imposed penalty as its own OVERDUE_PENALTY line, after principal and interest, instead of letting it spill into the next installment', () => {
+    const loanState = state({
+      openInstallments: [
+        {
+          installmentId: 'inst-1',
+          sequence: 1,
+          dueDate: new Date('2026-04-12'),
+          isOverdue: true,
+          remainingPrincipal: D(2500),
+          remainingCharges: D(500),
+          remainingPenalty: D(100),
+        },
+        {
+          installmentId: 'inst-2',
+          sequence: 2,
+          dueDate: new Date('2026-05-12'),
+          isOverdue: false,
+          remainingPrincipal: D(2500),
+          remainingCharges: D(500),
+          remainingPenalty: D(0),
+        },
+      ],
+    });
+
+    // Pays inst-1 in full (2500 + 500 + 100 = 3100) with nothing left over.
+    const lines = computeSuggestedAllocation(3100, loanState);
+
+    expect(lines).toEqual([
+      { component: 'EMI_PRINCIPAL', installmentId: 'inst-1', amount: D(2500) },
+      { component: 'EMI_CHARGES', installmentId: 'inst-1', amount: D(500) },
+      { component: 'OVERDUE_PENALTY', installmentId: 'inst-1', amount: D(100) },
+    ]);
+    // Critically, none of it should have landed on inst-2's principal.
+    expect(lines.some((l) => l.installmentId === 'inst-2')).toBe(false);
+  });
 });
 
 describe('validateAllocation (partial payment support)', () => {
@@ -97,6 +136,7 @@ describe('validateAllocation (partial payment support)', () => {
         isOverdue: false,
         remainingPrincipal: D(2500),
         remainingCharges: D(750),
+        remainingPenalty: D(0),
       },
     ],
   });
@@ -151,6 +191,26 @@ describe('validateAllocation (partial payment support)', () => {
         loanState,
       ),
     ).toThrow(AllocationError);
+  });
+
+  it('rejects over-allocating a penalty beyond its remaining balance', () => {
+    const withPenalty = state({
+      openInstallments: [
+        {
+          installmentId: 'inst-1',
+          sequence: 1,
+          dueDate: new Date('2026-04-12'),
+          isOverdue: true,
+          remainingPrincipal: D(0),
+          remainingCharges: D(0),
+          remainingPenalty: D(100),
+        },
+      ],
+    });
+
+    expect(() =>
+      validateAllocation(150, [{ component: 'OVERDUE_PENALTY', installmentId: 'inst-1', amount: D(150) }], withPenalty),
+    ).toThrow(/Penalty allocation.*exceeds its remaining balance/);
   });
 
   it('accepts an allocation that exactly exhausts down payment + full installment (the blueprint example)', () => {

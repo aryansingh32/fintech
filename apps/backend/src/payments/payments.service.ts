@@ -445,9 +445,8 @@ export class PaymentsService {
       dueDate: i.dueDate,
       isOverdue: i.status === 'OVERDUE',
       remainingPrincipal: new Decimal(i.principalAmount).minus(allocatedFor(i.id, ['EMI_PRINCIPAL'])),
-      remainingCharges: new Decimal(i.chargesAmount).minus(
-        allocatedFor(i.id, ['EMI_CHARGES', 'OVERDUE_PENALTY']),
-      ),
+      remainingCharges: new Decimal(i.chargesAmount).minus(allocatedFor(i.id, ['EMI_CHARGES'])),
+      remainingPenalty: new Decimal(i.penaltyAmount).minus(allocatedFor(i.id, ['OVERDUE_PENALTY'])),
     }));
 
     const pendingDownPayment = new Decimal(loan.downPaymentAmount).minus(loan.downPaymentPaid);

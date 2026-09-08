@@ -8,7 +8,7 @@ import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { Permission } from '../rbac/permissions';
 import { LoansService } from './loans.service';
 import { LoanProductsService } from './loan-products.service';
-import { CreateLoanDto, ApproveLoanDto, ApplyPenaltyDto, PreviewLoanDto, RescheduleInstallmentDto } from './dto/loan.dto';
+import { CreateLoanDto, ApproveLoanDto, ApplyPenaltyDto, PreviewLoanDto, RescheduleInstallmentDto, RevokePenaltyDto } from './dto/loan.dto';
 import {
   CreateLoanProductDto,
   CreateLoanProductVersionDto,
@@ -76,6 +76,17 @@ export class LoansController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.loans.applyPenalty(id, installmentId, dto, user);
+  }
+
+  @RequirePermissions(Permission.OVERDUE_MANAGE)
+  @Delete(':id/installments/:installmentId/penalty')
+  revokePenalty(
+    @Param('id') id: string,
+    @Param('installmentId') installmentId: string,
+    @Body() dto: RevokePenaltyDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.loans.revokePenalty(id, installmentId, dto, user);
   }
 
   @RequirePermissions(Permission.OVERDUE_MANAGE)

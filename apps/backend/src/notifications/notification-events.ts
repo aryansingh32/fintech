@@ -24,6 +24,7 @@ export enum NotificationEvent {
   KYC_VERIFIED = 'KYC_VERIFIED',
   KYC_REJECTED = 'KYC_REJECTED',
   PENALTY_APPLIED = 'PENALTY_APPLIED',
+  PENALTY_REVOKED = 'PENALTY_REVOKED',
   PAYMENT_RECEIVED_STAFF = 'PAYMENT_RECEIVED_STAFF',
 }
 
@@ -154,6 +155,13 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationEvent, NotificationTempl
     body: {
       en: 'A penalty of ₹{{amount}} was added to EMI {{sequence}} of {{loanNumber}} for late payment.',
       hi: '{{loanNumber}} की EMI {{sequence}} पर देरी से भुगतान के लिए ₹{{amount}} का विलंब शुल्क जोड़ा गया।',
+    },
+  },
+  [NotificationEvent.PENALTY_REVOKED]: {
+    title: { en: 'Late payment penalty removed', hi: 'विलंब शुल्क हटाया गया' },
+    body: {
+      en: 'The ₹{{amount}} penalty on EMI {{sequence}} of {{loanNumber}} has been removed.',
+      hi: '{{loanNumber}} की EMI {{sequence}} पर ₹{{amount}} का विलंब शुल्क हटा दिया गया है।',
     },
   },
   [NotificationEvent.KYC_REJECTED]: {

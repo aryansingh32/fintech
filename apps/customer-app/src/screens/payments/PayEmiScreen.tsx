@@ -12,13 +12,15 @@ import { formatMoney } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
 import { ApiError, AllocationComponent } from '@sptc/shared';
 
+// Kept deliberately simple - "Principal"/"Interest"/"Penalty" map 1:1 to
+// what shows on the EMI schedule, so there's nothing to translate in your head.
 const COMPONENT_LABEL: Record<AllocationComponent, string> = {
   [AllocationComponent.DOWN_PAYMENT]: 'Down Payment',
-  [AllocationComponent.EMI_PRINCIPAL]: 'EMI Principal',
-  [AllocationComponent.EMI_CHARGES]: 'EMI Charges',
-  [AllocationComponent.OVERDUE_PENALTY]: 'Overdue Penalty',
+  [AllocationComponent.EMI_PRINCIPAL]: 'Principal',
+  [AllocationComponent.EMI_CHARGES]: 'Interest',
+  [AllocationComponent.OVERDUE_PENALTY]: 'Penalty',
   [AllocationComponent.FEE]: 'Fee',
-  [AllocationComponent.OTHER]: 'Other',
+  [AllocationComponent.OTHER]: 'Other (unallocated)',
 };
 
 export function PayEmiScreen() {
@@ -111,12 +113,18 @@ export function PayEmiScreen() {
         {preview.isLoading ? (
           <LoadingState label="Calculating..." />
         ) : preview.data?.lines.length ? (
-          preview.data.lines.map((line, idx) => (
-            <View key={idx} style={styles.allocationRow}>
-              <Text style={styles.body}>{COMPONENT_LABEL[line.component]}</Text>
-              <Text style={styles.bodyStrong}>{formatMoney(line.amount)}</Text>
-            </View>
-          ))
+          preview.data.lines.map((line, idx) => {
+            const isPenalty = line.component === AllocationComponent.OVERDUE_PENALTY;
+            return (
+              <View key={idx} style={styles.allocationRow}>
+                <Text style={[styles.body, isPenalty && styles.penaltyLabel]}>
+                  {isPenalty ? '⚠ ' : ''}
+                  {COMPONENT_LABEL[line.component]}
+                </Text>
+                <Text style={[styles.bodyStrong, isPenalty && styles.penaltyLabel]}>{formatMoney(line.amount)}</Text>
+              </View>
+            );
+          })
         ) : (
           <Text style={styles.caption}>Enter an amount to see the allocation.</Text>
         )}
@@ -166,6 +174,7 @@ const styles = StyleSheet.create({
   },
   body: { ...typography.body, color: colors.textPrimary },
   bodyStrong: { ...typography.bodyStrong, color: colors.textPrimary },
+  penaltyLabel: { color: colors.statusOverdue },
   caption: { ...typography.caption, color: colors.textSecondary },
   disclaimer: { ...typography.caption, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.lg },
 });

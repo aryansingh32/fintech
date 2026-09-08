@@ -15,6 +15,7 @@ export interface OpenInstallmentState {
   isOverdue: boolean;
   remainingPrincipal: Decimal;
   remainingCharges: Decimal;
+  remainingPenalty: Decimal;
 }
 
 export interface LoanAllocationState {
@@ -73,11 +74,20 @@ export function computeSuggestedAllocation(
     if (remaining.gt(0) && installment.remainingCharges.gt(0)) {
       const take = Decimal.min(remaining, installment.remainingCharges);
       if (take.gt(0)) {
-        lines.push({
-          component: installment.isOverdue ? 'OVERDUE_PENALTY' : 'EMI_CHARGES',
-          installmentId: installment.installmentId,
-          amount: take,
-        });
+        lines.push({ component: 'EMI_CHARGES', installmentId: installment.installmentId, amount: take });
+        remaining = remaining.minus(take);
+      }
+    }
+
+    // Staff-imposed late penalties (LoansService.applyPenalty) are their own
+    // component, distinct from the interest above - this is what used to be
+    // missing entirely from the suggested split, which silently let a
+    // penalty's rupees spill over and get counted against the next
+    // installment's principal instead.
+    if (remaining.gt(0) && installment.remainingPenalty.gt(0)) {
+      const take = Decimal.min(remaining, installment.remainingPenalty);
+      if (take.gt(0)) {
+        lines.push({ component: 'OVERDUE_PENALTY', installmentId: installment.installmentId, amount: take });
         remaining = remaining.minus(take);
       }
     }
@@ -132,6 +142,7 @@ export function validateAllocation(
   const installmentById = new Map(state.openInstallments.map((i) => [i.installmentId, i]));
   const principalAllocated = new Map<string, Decimal>();
   const chargesAllocated = new Map<string, Decimal>();
+  const penaltyAllocated = new Map<string, Decimal>();
 
   for (const line of lines) {
     if (line.component === 'EMI_PRINCIPAL' || line.component === 'EMI_CHARGES' || line.component === 'OVERDUE_PENALTY') {
@@ -152,15 +163,24 @@ export function validateAllocation(
           );
         }
         principalAllocated.set(line.installmentId, next);
-      } else {
+      } else if (line.component === 'EMI_CHARGES') {
         const soFar = chargesAllocated.get(line.installmentId) ?? new Decimal(0);
         const next = soFar.plus(line.amount);
         if (next.gt(installment.remainingCharges)) {
           throw new AllocationError(
-            `Charges allocation for installment #${installment.sequence} exceeds its remaining balance.`,
+            `Interest allocation for installment #${installment.sequence} exceeds its remaining balance.`,
           );
         }
         chargesAllocated.set(line.installmentId, next);
+      } else {
+        const soFar = penaltyAllocated.get(line.installmentId) ?? new Decimal(0);
+        const next = soFar.plus(line.amount);
+        if (next.gt(installment.remainingPenalty)) {
+          throw new AllocationError(
+            `Penalty allocation for installment #${installment.sequence} exceeds its remaining balance.`,
+          );
+        }
+        penaltyAllocated.set(line.installmentId, next);
       }
     }
   }

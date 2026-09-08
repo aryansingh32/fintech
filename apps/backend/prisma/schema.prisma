@@ -519,10 +519,10 @@ model Installment {
   principalAmount Decimal           @db.Decimal(14, 2)
   chargesAmount   Decimal           @default(0) @db.Decimal(14, 2)
   // Cumulative late-payment penalties applied by staff, layered on top of
-  // the original schedule - see LoansService.applyPenalty. Already folded
-  // into totalAmount (and the parent Loan's totalPayable) so payment
-  // allocation and ledger reconciliation don't need to know about it
-  // separately.
+  // the original schedule - see LoansService.applyPenalty/revokePenalty.
+  // Folded into totalAmount (and the parent Loan's totalPayable), and also
+  // tracked as its own OVERDUE_PENALTY allocation component so a payment
+  // that covers it is never miscounted against principal/interest instead.
   penaltyAmount   Decimal           @default(0) @db.Decimal(14, 2)
   totalAmount     Decimal           @db.Decimal(14, 2)
   paidAmount      Decimal           @default(0) @db.Decimal(14, 2)

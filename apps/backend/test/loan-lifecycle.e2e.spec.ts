@@ -251,4 +251,88 @@ describe('Loan lifecycle (e2e)', () => {
     const loan = await prisma.loan.findUniqueOrThrow({ where: { id: loanId } });
     expect(loan.downPaymentPaid.toFixed(2)).toBe('0.00');
   });
+
+  let installment1Id: string;
+  let installment2Id: string;
+
+  it('applies a late-payment penalty, then a payment that covers principal + penalty exactly pays off both without any of it leaking onto the next EMI', async () => {
+    const loanBefore = await request(app.getHttpServer()).get(`/v1/loans/${loanId}`).set(auth()).expect(200);
+    const sorted = [...loanBefore.body.installments].sort((a: { sequence: number }, b: { sequence: number }) => a.sequence - b.sequence);
+    installment1Id = sorted[0].id;
+    installment2Id = sorted[1].id;
+    expect(sorted[0].totalAmount).toBe('6000.00');
+
+    await request(app.getHttpServer())
+      .post(`/v1/loans/${loanId}/installments/${installment1Id}/penalty`)
+      .set(auth())
+      .send({ amount: 100, reason: '10 days late' })
+      .expect(201);
+
+    const afterPenalty = await request(app.getHttpServer()).get(`/v1/loans/${loanId}`).set(auth()).expect(200);
+    const inst1AfterPenalty = afterPenalty.body.installments.find((i: { id: string }) => i.id === installment1Id);
+    expect(inst1AfterPenalty.penaltyAmount).toBe('100.00');
+    expect(inst1AfterPenalty.totalAmount).toBe('6100.00');
+
+    // Clear the still-pending down payment first so it doesn't eat into the
+    // next payment's allocation - isolates what we're actually testing.
+    await request(app.getHttpServer())
+      .post('/v1/payments/collect')
+      .set(auth())
+      .send({ loanId, amount: 2000, method: 'CASH', idempotencyKey: `e2e-dp-${Date.now()}` })
+      .expect(201);
+
+    const preview = await request(app.getHttpServer())
+      .get(`/v1/payments/loans/${loanId}/allocation-preview`)
+      .query({ amount: '6100' })
+      .set(auth())
+      .expect(200);
+    // This is the exact bug reported: a penalty payment must show up as its
+    // own line, and never bleed into the next installment's principal.
+    expect(preview.body.lines).toEqual([
+      { component: 'EMI_PRINCIPAL', installmentId: installment1Id, amount: '6000.00' },
+      { component: 'OVERDUE_PENALTY', installmentId: installment1Id, amount: '100.00' },
+    ]);
+
+    await request(app.getHttpServer())
+      .post('/v1/payments/collect')
+      .set(auth())
+      .send({ loanId, amount: 6100, method: 'CASH', idempotencyKey: `e2e-penalty-pay-${Date.now()}` })
+      .expect(201);
+
+    const afterPayment = await request(app.getHttpServer()).get(`/v1/loans/${loanId}`).set(auth()).expect(200);
+    const inst1Final = afterPayment.body.installments.find((i: { id: string }) => i.id === installment1Id);
+    const inst2Final = afterPayment.body.installments.find((i: { id: string }) => i.id === installment2Id);
+    expect(inst1Final.status).toBe('PAID');
+    expect(inst1Final.paidAmount).toBe('6100.00');
+    // The second EMI must be untouched - none of the penalty payment should
+    // have been miscounted against its principal.
+    expect(inst2Final.paidAmount).toBe('0.00');
+    expect(inst2Final.totalAmount).toBe('6000.00');
+  });
+
+  it('lets staff revoke an unpaid penalty, and rejects revoking one that was already paid off', async () => {
+    await request(app.getHttpServer())
+      .post(`/v1/loans/${loanId}/installments/${installment2Id}/penalty`)
+      .set(auth())
+      .send({ amount: 50, reason: 'late fee applied by mistake' })
+      .expect(201);
+
+    const revokeRes = await request(app.getHttpServer())
+      .delete(`/v1/loans/${loanId}/installments/${installment2Id}/penalty`)
+      .set(auth())
+      .send({ reason: 'waived - staff error' })
+      .expect(200);
+    expect(revokeRes.body.penaltyAmount).toBe('0.00');
+    expect(revokeRes.body.totalAmount).toBe('6000.00');
+
+    const loanAfterRevoke = await request(app.getHttpServer()).get(`/v1/loans/${loanId}`).set(auth()).expect(200);
+    expect(loanAfterRevoke.body.totalPayable).toBe('18100.00');
+
+    // installment1's penalty was fully paid off in the previous test - revoking it now must be rejected.
+    await request(app.getHttpServer())
+      .delete(`/v1/loans/${loanId}/installments/${installment1Id}/penalty`)
+      .set(auth())
+      .send({ reason: 'trying to undo a paid penalty' })
+      .expect(400);
+  });
 });
