@@ -152,8 +152,8 @@ describe('Support / Reports / Offline Sync (e2e)', () => {
     expect(res.body.messages).toHaveLength(1);
   });
 
-  it('a collection agent (no SUPPORT_VIEW permission) cannot list support tickets', async () => {
-    await request(app.getHttpServer()).get('/v1/support/tickets').set(bearer(agentToken)).expect(403);
+  it('a collection agent can list support tickets (every approved staff role has full access)', async () => {
+    await request(app.getHttpServer()).get('/v1/support/tickets').set(bearer(agentToken)).expect(200);
   });
 
   it('owner sees the ticket, replies, and the ticket moves to IN_PROGRESS', async () => {
@@ -174,8 +174,8 @@ describe('Support / Reports / Offline Sync (e2e)', () => {
     expect(detail.body.messages).toHaveLength(2);
   });
 
-  it('a collection agent (no REPORTS_VIEW_BRANCH permission) cannot view reports', async () => {
-    await request(app.getHttpServer()).get('/v1/reports/loan-portfolio').set(bearer(agentToken)).expect(403);
+  it('a collection agent can view reports (every approved staff role has full access)', async () => {
+    await request(app.getHttpServer()).get('/v1/reports/loan-portfolio').set(bearer(agentToken)).expect(200);
   });
 
   it('owner can view the loan portfolio and overdue aging reports', async () => {

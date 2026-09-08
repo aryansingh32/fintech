@@ -50,71 +50,21 @@ export enum Permission {
 }
 
 /**
- * Default permission set per role. StaffPermission rows can add/revoke
- * individual keys on top of this without inventing a new role.
+ * Every role gets full, identical access to every permission-gated action.
+ * There is deliberately no per-role restriction here: any staff account
+ * that is approved by the super admin (see StaffModule / isApproved) has
+ * exactly the same capabilities as the super admin - same data, same
+ * functions, same commands, across every branch. The role field still
+ * exists for labeling/organizational purposes (and for StaffPermission
+ * overrides on top of this, if ever needed), but it no longer restricts
+ * anything by itself.
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
-  // Sole role allowed to create/approve/reject other staff accounts (see StaffModule).
   [StaffRole.SUPER_ADMIN]: Object.values(Permission),
-  // Full application access, same as OWNER, except staff management - only
-  // the SUPER_ADMIN who approved them can manage other staff accounts.
-  [StaffRole.ADMIN]: Object.values(Permission).filter((p) => p !== Permission.STAFF_MANAGE),
+  [StaffRole.ADMIN]: Object.values(Permission),
   [StaffRole.OWNER]: Object.values(Permission),
-  [StaffRole.MANAGER]: [
-    Permission.CUSTOMER_CREATE,
-    Permission.CUSTOMER_VIEW,
-    Permission.CUSTOMER_EDIT,
-    Permission.CUSTOMER_DELETE,
-    Permission.CUSTOMER_NOTE_ADD,
-    Permission.KYC_CAPTURE,
-    Permission.KYC_VERIFY,
-    Permission.PRODUCT_MANAGE,
-    Permission.LOAN_CREATE,
-    Permission.LOAN_VIEW,
-    Permission.LOAN_APPROVE,
-    Permission.LOAN_RESCHEDULE,
-    Permission.AGREEMENT_MANAGE,
-    Permission.PAYMENT_COLLECT,
-    Permission.PAYMENT_ALLOCATE,
-    Permission.PAYMENT_VIEW,
-    Permission.PAYMENT_REVERSE,
-    Permission.COLLECTION_VIEW_ASSIGNED,
-    Permission.COLLECTION_ASSIGN,
-    Permission.OVERDUE_MANAGE,
-    Permission.REPORTS_VIEW_BRANCH,
-    Permission.SUPPORT_VIEW,
-    Permission.SUPPORT_REPLY,
-    Permission.SUPPORT_ESCALATE,
-  ],
-  [StaffRole.SHOPKEEPER]: [
-    Permission.CUSTOMER_CREATE,
-    Permission.CUSTOMER_VIEW,
-    Permission.CUSTOMER_EDIT,
-    Permission.CUSTOMER_NOTE_ADD,
-    Permission.KYC_CAPTURE,
-    Permission.KYC_VERIFY,
-    Permission.PRODUCT_MANAGE,
-    Permission.LOAN_CREATE,
-    Permission.LOAN_VIEW,
-    Permission.LOAN_APPROVE,
-    Permission.LOAN_RESCHEDULE,
-    Permission.PAYMENT_COLLECT,
-    Permission.PAYMENT_ALLOCATE,
-    Permission.PAYMENT_VIEW,
-    Permission.OVERDUE_MANAGE,
-    Permission.REPORTS_VIEW_BRANCH,
-  ],
-  [StaffRole.COLLECTION_AGENT]: [
-    Permission.CUSTOMER_VIEW,
-    Permission.LOAN_VIEW,
-    Permission.PAYMENT_COLLECT,
-    Permission.PAYMENT_VIEW,
-    Permission.COLLECTION_VIEW_ASSIGNED,
-  ],
-  [StaffRole.SUPPORT_AGENT]: [
-    Permission.CUSTOMER_VIEW,
-    Permission.SUPPORT_VIEW,
-    Permission.SUPPORT_REPLY,
-    Permission.SUPPORT_ESCALATE,
-  ],
+  [StaffRole.MANAGER]: Object.values(Permission),
+  [StaffRole.SHOPKEEPER]: Object.values(Permission),
+  [StaffRole.COLLECTION_AGENT]: Object.values(Permission),
+  [StaffRole.SUPPORT_AGENT]: Object.values(Permission),
 };

@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { AuditActorType, StaffRole } from '@prisma/client';
+import { AuditActorType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
@@ -43,18 +43,13 @@ export class StaffService {
     const existing = await this.prisma.staffUser.findUnique({ where: { mobile: dto.mobile } });
     if (existing) throw new ConflictException('A staff account with this mobile number already exists.');
 
-    const isGlobal = dto.role === StaffRole.SUPER_ADMIN || dto.role === StaffRole.ADMIN || dto.role === StaffRole.OWNER;
-    // Branch-scoped roles (Manager, Shopkeeper, Collection Agent, Support
-    // Agent) MUST end up with a real branchId - branchWhereClause() maps a
-    // null branchId to a filter that matches nothing, so a staff account
-    // created without one would see zero customers/loans/payments/reports
-    // anywhere in the app (effectively a different, empty app) despite
-    // logging in successfully. There's no branch picker in the UI yet
-    // (single-branch business today), so fall back to the creating staff
-    // member's own branch, then to the only/first branch in the system.
-    const branchId = isGlobal
-      ? dto.branchId
-      : (dto.branchId ?? actor.branchId ?? (await this.prisma.branch.findFirst())?.id);
+    // Every approved staff account has full access across every branch -
+    // same data, same functions, same commands as the super admin,
+    // regardless of role (see DEFAULT_ROLE_PERMISSIONS). isGlobal bypasses
+    // branch scoping entirely (assertBranchAccess/branchWhereClause), so
+    // every staff member sees the same customers/loans/payments/reports.
+    const isGlobal = true;
+    const branchId = dto.branchId ?? actor.branchId ?? (await this.prisma.branch.findFirst())?.id;
 
     const created = await this.prisma.staffUser.create({
       data: {

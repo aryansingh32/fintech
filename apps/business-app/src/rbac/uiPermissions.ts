@@ -1,47 +1,45 @@
 import { StaffRole } from '@sptc/shared';
 
 /**
- * Coarse, role-only UI gating - decides which screens/buttons to SHOW.
- * This is a convenience layer, not a security boundary: the backend's
- * AccessGuard (role defaults + per-staff StaffPermission overrides) is the
- * only thing that actually decides whether a call succeeds (blueprint
- * #41). A staff member whose permission was individually revoked might
- * still see a button here and get a 403 from the server when they tap it -
- * that's a display gap, not a security one.
+ * Every approved staff account has full access to every screen and action -
+ * same data, same functions, same commands as the super admin, regardless
+ * of role (see backend DEFAULT_ROLE_PERMISSIONS, which grants every role
+ * every Permission). These all return true unconditionally so the UI never
+ * hides something the backend would actually allow. The role parameter is
+ * kept so call sites don't need to change if a real restriction is ever
+ * reintroduced.
  */
-
-/** Only SUPER_ADMIN can create/approve/reject other staff accounts (Permission.STAFF_MANAGE - see DEFAULT_ROLE_PERMISSIONS). */
-export function canManageBranchesAndStaff(role: StaffRole): boolean {
-  return role === StaffRole.SUPER_ADMIN;
+export function canManageBranchesAndStaff(_role: StaffRole): boolean {
+  return true;
 }
 
-export function canApproveLoans(role: StaffRole): boolean {
-  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SHOPKEEPER].includes(role);
+export function canApproveLoans(_role: StaffRole): boolean {
+  return true;
 }
 
-export function canCollectPayments(role: StaffRole): boolean {
-  return role !== StaffRole.SUPPORT_AGENT;
+export function canCollectPayments(_role: StaffRole): boolean {
+  return true;
 }
 
-export function canViewReports(role: StaffRole): boolean {
-  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SHOPKEEPER].includes(role);
+export function canViewReports(_role: StaffRole): boolean {
+  return true;
 }
 
-export function canManageCustomersAndLoans(role: StaffRole): boolean {
-  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SHOPKEEPER].includes(role);
+export function canManageCustomersAndLoans(_role: StaffRole): boolean {
+  return true;
 }
 
-export function canUseSupport(role: StaffRole): boolean {
-  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SUPPORT_AGENT].includes(role);
+export function canUseSupport(_role: StaffRole): boolean {
+  return true;
 }
 
-export function canManageAgreements(role: StaffRole): boolean {
-  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER, StaffRole.MANAGER].includes(role);
+export function canManageAgreements(_role: StaffRole): boolean {
+  return true;
 }
 
-/** Mirrors StaffUser.isGlobal for the two new top-of-hierarchy roles, so "Manage Loan Products" etc. also show for them. */
-export function isGlobalRole(role: StaffRole): boolean {
-  return [StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.OWNER].includes(role);
+/** Mirrors StaffUser.isGlobal - every role is global now, so "Manage Loan Products" etc. show for everyone. */
+export function isGlobalRole(_role: StaffRole): boolean {
+  return true;
 }
 
 export function roleLabel(role: StaffRole): string {
