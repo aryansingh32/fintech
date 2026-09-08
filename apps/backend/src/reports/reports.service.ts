@@ -87,9 +87,14 @@ export class ReportsService {
   }
 
   async overdueAging(user: AuthUser, filters: ReportFilters) {
+    // Not just status === OVERDUE - status gets stuck on PARTIALLY_PAID once
+    // any money lands on an EMI, even after its due date passes, so an EMI
+    // the customer has part-paid but is still overdue on would otherwise be
+    // invisible here. Due date is the authoritative signal, not the enum.
     const installments = await this.prisma.installment.findMany({
       where: {
-        status: InstallmentStatus.OVERDUE,
+        status: { notIn: [InstallmentStatus.PAID, InstallmentStatus.CANCELLED] },
+        dueDate: { lt: new Date() },
         loan: { ...this.resolveBranchFilter(user, filters.branchId), customerId: filters.customerId },
       },
       include: { loan: { include: { customer: true } } },
@@ -122,7 +127,17 @@ export class ReportsService {
     return this.prisma.installment.findMany({
       where: {
         dueDate,
-        status: { in: [InstallmentStatus.UPCOMING, InstallmentStatus.DUE, InstallmentStatus.OVERDUE] },
+        // PARTIALLY_PAID included alongside the obviously-open statuses - an
+        // EMI due in this window that's already been part-paid still has a
+        // balance due on that date and shouldn't disappear from this list.
+        status: {
+          in: [
+            InstallmentStatus.UPCOMING,
+            InstallmentStatus.DUE,
+            InstallmentStatus.OVERDUE,
+            InstallmentStatus.PARTIALLY_PAID,
+          ],
+        },
         loan: { ...this.resolveBranchFilter(user, filters.branchId), customerId: filters.customerId },
       },
       include: { loan: { include: { customer: true } } },

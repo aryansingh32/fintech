@@ -41,7 +41,11 @@ module.exports = {
       [
         'expo-notifications',
         {
-          icon: './assets/icon.png',
+          // Must be a white silhouette on a transparent background - Android
+          // draws the status-bar icon by masking this to solid white and
+          // ignores any color info, so the full-color app icon (used here
+          // before) rendered as an opaque dark square instead of a mark.
+          icon: './assets/notification-icon.png',
           color: '#0B1F3A',
         },
       ],
