@@ -6,7 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { OtpService } from './otp.service';
 import { SessionService, IssuedTokens } from './session.service';
 import { DeviceInfoDto } from './dto/device-info.dto';
-import { FirebaseAdminService } from '../firebase/firebase-admin.service';
+import { GoogleTokenService } from './google-token.service';
 
 export type StaffLoginResult =
   | { status: 'DEVICE_VERIFICATION_REQUIRED'; requestId: string; devOtp?: string }
@@ -19,22 +19,24 @@ export class StaffAuthService {
     private readonly otp: OtpService,
     private readonly sessions: SessionService,
     private readonly audit: AuditService,
-    private readonly firebase: FirebaseAdminService,
+    private readonly googleTokens: GoogleTokenService,
   ) {}
 
   /** Google Sign-In for an existing staff account matched by verified email - never a self-signup path (staff accounts are provisioned by an Owner). */
   async googleLogin(idToken: string, device: DeviceInfoDto, ipAddress?: string): Promise<StaffLoginResult> {
-    const auth = this.firebase.getAuth();
-    if (!auth) throw new ServiceUnavailableException('Google Sign-In is not configured.');
-
-    let email: string | undefined;
-    try {
-      const decoded = await auth.verifyIdToken(idToken);
-      email = decoded.email_verified ? decoded.email : undefined;
-    } catch {
-      throw new UnauthorizedException('Invalid or expired Google sign-in token.');
+    if (!this.googleTokens.isConfigured()) {
+      throw new ServiceUnavailableException('Google Sign-In is not configured.');
     }
-    if (!email) throw new UnauthorizedException('Your Google account has no verified email.');
+
+    const result = await this.googleTokens.verify(idToken);
+    if (!result.ok) {
+      throw new UnauthorizedException(
+        result.reason === 'email_not_verified'
+          ? 'Your Google account has no verified email.'
+          : 'Invalid or expired Google sign-in token.',
+      );
+    }
+    const { email } = result;
 
     const staff = await this.prisma.staffUser.findFirst({ where: { email, isActive: true } });
     if (!staff) {

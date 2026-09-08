@@ -5,6 +5,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { TokenService } from './token.service';
 import { OtpService } from './otp.service';
 import { SessionService } from './session.service';
+import { GoogleTokenService } from './google-token.service';
 import { CustomerAuthService } from './customer-auth.service';
 import { StaffAuthService } from './staff-auth.service';
 import { CustomerAuthController } from './customer-auth.controller';
@@ -19,6 +20,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
     TokenService,
     OtpService,
     SessionService,
+    GoogleTokenService,
     CustomerAuthService,
     StaffAuthService,
     // Not registered as APP_GUARD here - AppModule registers all global

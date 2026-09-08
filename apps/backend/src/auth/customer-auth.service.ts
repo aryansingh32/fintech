@@ -7,7 +7,7 @@ import { OtpService } from './otp.service';
 import { SessionService, IssuedTokens } from './session.service';
 import { DeviceInfoDto } from './dto/device-info.dto';
 import { generateCustomerCode, retryOnConflict } from '../common/id-generators';
-import { FirebaseAdminService } from '../firebase/firebase-admin.service';
+import { GoogleTokenService } from './google-token.service';
 
 @Injectable()
 export class CustomerAuthService {
@@ -16,7 +16,7 @@ export class CustomerAuthService {
     private readonly otp: OtpService,
     private readonly sessions: SessionService,
     private readonly audit: AuditService,
-    private readonly firebase: FirebaseAdminService,
+    private readonly googleTokens: GoogleTokenService,
   ) {}
 
   /**
@@ -32,17 +32,19 @@ export class CustomerAuthService {
     device: DeviceInfoDto,
     ipAddress?: string,
   ): Promise<IssuedTokens & { customerId: string }> {
-    const auth = this.firebase.getAuth();
-    if (!auth) throw new ServiceUnavailableException('Google Sign-In is not configured.');
-
-    let email: string | undefined;
-    try {
-      const decoded = await auth.verifyIdToken(idToken);
-      email = decoded.email_verified ? decoded.email : undefined;
-    } catch {
-      throw new UnauthorizedException('Invalid or expired Google sign-in token.');
+    if (!this.googleTokens.isConfigured()) {
+      throw new ServiceUnavailableException('Google Sign-In is not configured.');
     }
-    if (!email) throw new UnauthorizedException('Your Google account has no verified email.');
+
+    const result = await this.googleTokens.verify(idToken);
+    if (!result.ok) {
+      throw new UnauthorizedException(
+        result.reason === 'email_not_verified'
+          ? 'Your Google account has no verified email.'
+          : 'Invalid or expired Google sign-in token.',
+      );
+    }
+    const { email } = result;
 
     const customer = await this.prisma.customer.findFirst({ where: { email, isActive: true } });
     if (!customer) {
