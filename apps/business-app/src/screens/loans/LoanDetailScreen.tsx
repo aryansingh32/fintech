@@ -22,6 +22,15 @@ import { formatDate, formatMoney } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
 import { ApiError, Installment } from '@sptc/shared';
 
+// `status` gets stuck on PARTIALLY_PAID once any money lands on an EMI, even
+// if its due date has since passed - so it alone can't tell us whether an
+// EMI is overdue. Checking the due date directly catches a partially-paid
+// EMI that's also overdue, which `status === 'OVERDUE'` alone would miss.
+function isPastDue(installment: Installment): boolean {
+  if (installment.status === 'PAID' || installment.status === 'CANCELLED') return false;
+  return new Date(installment.dueDate).getTime() < Date.now();
+}
+
 export function LoanDetailScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'LoanDetail'>>();
@@ -50,7 +59,7 @@ export function LoanDetailScreen() {
       paid = paid.plus(installment.paidAmount);
       const remaining = new Decimal(installment.totalAmount).minus(installment.paidAmount);
       if (remaining.gt(0)) outstanding = outstanding.plus(remaining);
-      if (installment.status === 'OVERDUE') overdue = overdue.plus(remaining);
+      if (isPastDue(installment)) overdue = overdue.plus(remaining);
     }
     return { paid: paid.toFixed(2), outstanding: outstanding.toFixed(2), overdue: overdue.toFixed(2) };
   }, [loan]);
@@ -248,8 +257,10 @@ export function LoanDetailScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ alignItems: 'flex-end', marginRight: spacing.sm }}>
                   <Text style={styles.bodyStrong}>{formatMoney(installment.totalAmount)}</Text>
-                  <Text style={styles.caption}>
-                    {installment.status} {Number(installment.paidAmount) > 0 ? `· Paid ${formatMoney(installment.paidAmount)}` : ''}
+                  <Text style={[styles.caption, isPastDue(installment) && styles.penaltyCaption]}>
+                    {installment.status}
+                    {installment.status !== 'OVERDUE' && isPastDue(installment) ? ' · Overdue' : ''}
+                    {Number(installment.paidAmount) > 0 ? ` · Paid ${formatMoney(installment.paidAmount)}` : ''}
                   </Text>
                   {Number(installment.penaltyAmount ?? 0) > 0 ? (
                     <Text style={styles.penaltyCaption}>Penalty {formatMoney(installment.penaltyAmount!)}</Text>
@@ -260,7 +271,7 @@ export function LoanDetailScreen() {
                     <Ionicons name="pencil" size={16} color={colors.textSecondary} />
                   </Pressable>
                 ) : null}
-                {canReschedule && installment.status === 'OVERDUE' ? (
+                {canReschedule && isPastDue(installment) ? (
                   <>
                     <Pressable
                       onPress={() => {

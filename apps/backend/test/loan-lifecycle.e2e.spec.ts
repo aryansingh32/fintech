@@ -310,12 +310,37 @@ describe('Loan lifecycle (e2e)', () => {
     expect(inst2Final.totalAmount).toBe('6000.00');
   });
 
-  it('lets staff revoke an unpaid penalty, and rejects revoking one that was already paid off', async () => {
+  it('revoking a penalty that was already fully paid off credits that money onto the next EMI instead of blocking the removal', async () => {
+    // installment1's 100 penalty was fully paid in the previous test, as part
+    // of the same payment that fully paid its principal - so there is no
+    // room left on installment1 itself, and the credit must cascade to EMI 2.
+    const revokeRes = await request(app.getHttpServer())
+      .delete(`/v1/loans/${loanId}/installments/${installment1Id}/penalty`)
+      .set(auth())
+      .send({ reason: 'waived after the fact - staff error' })
+      .expect(200);
+    expect(revokeRes.body.penaltyAmount).toBe('0.00');
+    expect(revokeRes.body.totalAmount).toBe('6000.00');
+    expect(revokeRes.body.paidAmount).toBe('6000.00');
+    expect(revokeRes.body.status).toBe('PAID');
+
+    const loanAfterRevoke = await request(app.getHttpServer()).get(`/v1/loans/${loanId}`).set(auth()).expect(200);
+    expect(loanAfterRevoke.body.totalPayable).toBe('18000.00');
+    const inst2AfterRevoke = loanAfterRevoke.body.installments.find((i: { id: string }) => i.id === installment2Id);
+    expect(inst2AfterRevoke.paidAmount).toBe('100.00');
+    expect(inst2AfterRevoke.status).toBe('PARTIALLY_PAID');
+  });
+
+  it('revoking a penalty that was never paid just erases the charge, with nothing to reassign', async () => {
     await request(app.getHttpServer())
       .post(`/v1/loans/${loanId}/installments/${installment2Id}/penalty`)
       .set(auth())
       .send({ amount: 50, reason: 'late fee applied by mistake' })
       .expect(201);
+
+    const afterPenalty = await request(app.getHttpServer()).get(`/v1/loans/${loanId}`).set(auth()).expect(200);
+    const inst2AfterPenalty = afterPenalty.body.installments.find((i: { id: string }) => i.id === installment2Id);
+    expect(inst2AfterPenalty.totalAmount).toBe('6050.00');
 
     const revokeRes = await request(app.getHttpServer())
       .delete(`/v1/loans/${loanId}/installments/${installment2Id}/penalty`)
@@ -324,15 +349,8 @@ describe('Loan lifecycle (e2e)', () => {
       .expect(200);
     expect(revokeRes.body.penaltyAmount).toBe('0.00');
     expect(revokeRes.body.totalAmount).toBe('6000.00');
-
-    const loanAfterRevoke = await request(app.getHttpServer()).get(`/v1/loans/${loanId}`).set(auth()).expect(200);
-    expect(loanAfterRevoke.body.totalPayable).toBe('18100.00');
-
-    // installment1's penalty was fully paid off in the previous test - revoking it now must be rejected.
-    await request(app.getHttpServer())
-      .delete(`/v1/loans/${loanId}/installments/${installment1Id}/penalty`)
-      .set(auth())
-      .send({ reason: 'trying to undo a paid penalty' })
-      .expect(400);
+    // Nothing had been collected toward this one, so EMI 2's paid amount (the
+    // 100 credited in from EMI 1) is untouched by removing the charge.
+    expect(revokeRes.body.paidAmount).toBe('100.00');
   });
 });

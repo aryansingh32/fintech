@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import RazorpayCheckout from 'react-native-razorpay';
 import { colors, spacing, typography } from '@/theme/theme';
-import { Card, ErrorState, LoadingState, PrimaryButton } from '@/components/ui';
+import { Card, LoadingState, PrimaryButton } from '@/components/ui';
 import { useAllocationPreview } from '@/hooks/useApi';
 import { useMyProfile } from '@/hooks/useProfile';
 import { apiClient } from '@/api/apiClient';
@@ -12,16 +12,21 @@ import { formatMoney } from '@/utils/format';
 import { RootStackParamList } from '@/navigation/types';
 import { ApiError, AllocationComponent } from '@sptc/shared';
 
-// Kept deliberately simple - "Principal"/"Interest"/"Penalty" map 1:1 to
-// what shows on the EMI schedule, so there's nothing to translate in your head.
-const COMPONENT_LABEL: Record<AllocationComponent, string> = {
+const SHOP_NAME = 'Shri Parasnath Telecom Centre, Khekra';
+const SHOP_PHONE_NUMBERS = ['9719202374', '9045904090', '9719213620'];
+
+// Bucketed for the customer, not itemized like the staff app - "Principal"
+// vs "Interest" is meaningless to someone paying an EMI. They only need to
+// know: is this the regular EMI amount, a down payment, or a penalty.
+const DISPLAY_GROUP: Record<AllocationComponent, 'Down Payment' | 'EMI Amount' | 'Penalty' | 'Other'> = {
   [AllocationComponent.DOWN_PAYMENT]: 'Down Payment',
-  [AllocationComponent.EMI_PRINCIPAL]: 'Principal',
-  [AllocationComponent.EMI_CHARGES]: 'Interest',
+  [AllocationComponent.EMI_PRINCIPAL]: 'EMI Amount',
+  [AllocationComponent.EMI_CHARGES]: 'EMI Amount',
+  [AllocationComponent.FEE]: 'EMI Amount',
   [AllocationComponent.OVERDUE_PENALTY]: 'Penalty',
-  [AllocationComponent.FEE]: 'Fee',
-  [AllocationComponent.OTHER]: 'Other (unallocated)',
+  [AllocationComponent.OTHER]: 'Other',
 };
+const GROUP_ORDER = ['Down Payment', 'EMI Amount', 'Penalty', 'Other'] as const;
 
 export function PayEmiScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -87,8 +92,20 @@ export function PayEmiScreen() {
 
   if (error) {
     return (
-      <View style={styles.screen}>
-        <ErrorState message={error} onRetry={() => setError(null)} />
+      <View style={[styles.screen, styles.centered]}>
+        <Text style={styles.errorTitle}>Something went wrong</Text>
+        <Text style={styles.errorMessage}>{error}</Text>
+        <Text style={[styles.errorMessage, { marginTop: spacing.md }]}>
+          Please contact {SHOP_NAME}, or call to pay your EMI:
+        </Text>
+        {SHOP_PHONE_NUMBERS.map((number) => (
+          <Text key={number} style={styles.phoneLink} onPress={() => Linking.openURL(`tel:${number}`)}>
+            {number}
+          </Text>
+        ))}
+        <View style={{ marginTop: spacing.lg, width: 160 }}>
+          <PrimaryButton label="Try again" onPress={() => setError(null)} variant="secondary" />
+        </View>
       </View>
     );
   }
@@ -108,25 +125,29 @@ export function PayEmiScreen() {
         </View>
       </Card>
 
-      <Text style={styles.sectionTitle}>This payment will be allocated as:</Text>
+      <Text style={styles.sectionTitle}>This payment covers:</Text>
       <Card>
         {preview.isLoading ? (
           <LoadingState label="Calculating..." />
         ) : preview.data?.lines.length ? (
-          preview.data.lines.map((line, idx) => {
-            const isPenalty = line.component === AllocationComponent.OVERDUE_PENALTY;
+          GROUP_ORDER.map((group) => {
+            const total = preview.data!.lines
+              .filter((l) => DISPLAY_GROUP[l.component] === group)
+              .reduce((sum, l) => sum + Number(l.amount), 0);
+            if (total <= 0) return null;
+            const isPenalty = group === 'Penalty';
             return (
-              <View key={idx} style={styles.allocationRow}>
+              <View key={group} style={styles.allocationRow}>
                 <Text style={[styles.body, isPenalty && styles.penaltyLabel]}>
                   {isPenalty ? '⚠ ' : ''}
-                  {COMPONENT_LABEL[line.component]}
+                  {group}
                 </Text>
-                <Text style={[styles.bodyStrong, isPenalty && styles.penaltyLabel]}>{formatMoney(line.amount)}</Text>
+                <Text style={[styles.bodyStrong, isPenalty && styles.penaltyLabel]}>{formatMoney(total)}</Text>
               </View>
             );
           })
         ) : (
-          <Text style={styles.caption}>Enter an amount to see the allocation.</Text>
+          <Text style={styles.caption}>Enter an amount to see what it covers.</Text>
         )}
       </Card>
 
@@ -153,6 +174,10 @@ function isRazorpayCancellation(err: unknown): boolean {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  centered: { alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  errorTitle: { ...typography.h2, color: colors.statusFailed, textAlign: 'center' },
+  errorMessage: { ...typography.caption, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
+  phoneLink: { ...typography.bodyStrong, color: colors.brand, marginTop: spacing.sm, textDecorationLine: 'underline' },
   label: { ...typography.captionStrong, color: colors.textSecondary },
   amountRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
   rupee: { ...typography.display, color: colors.textPrimary, marginRight: spacing.xs },

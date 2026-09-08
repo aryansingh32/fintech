@@ -104,7 +104,7 @@ export class PaymentsService {
 
     if (!this.gateway.isConfigured()) {
       throw new ServiceUnavailableException(
-        'Online payments are not available right now. Please pay at the store or contact support.',
+        'Online payments are not available right now.',
       );
     }
 

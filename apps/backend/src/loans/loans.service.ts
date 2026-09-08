@@ -3,7 +3,7 @@ import Decimal from 'decimal.js';
 import { AdjustmentType, AllocationComponent, AuditActorType, LedgerEntryType, LoanStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { LedgerService } from '../ledger/ledger.service';
+import { LedgerService, PrismaTx } from '../ledger/ledger.service';
 import { CustomersService } from '../customers/customers.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationEvent } from '../notifications/notification-events';
@@ -523,11 +523,12 @@ export class LoansService {
   }
 
   /**
-   * Waives whatever portion of a penalty (applied above via `applyPenalty`)
-   * is still unpaid. Money already collected against it is left alone -
-   * undoing a penalty a customer already paid is a payment reversal
-   * (PaymentsService.reversePayment), not a waiver of a charge that no
-   * longer exists.
+   * Removes a penalty outright, whether or not any of it has been paid yet.
+   * The charge itself always disappears (penaltyAmount -> 0, totalAmount and
+   * totalPayable shrink to match). If money was already collected against
+   * it, that money isn't refunded or lost - it's credited toward this same
+   * EMI's principal first, then cascades forward to the next open EMI(s) in
+   * sequence, so the customer keeps credit for what they already paid.
    */
   async revokePenalty(loanId: string, installmentId: string, dto: RevokePenaltyDto, staff: AuthUser) {
     const loan = await this.findById(loanId, staff);
@@ -539,7 +540,7 @@ export class LoansService {
       throw new BadRequestException('This installment has no penalty to remove.');
     }
 
-    const paidPenalty = await this.prisma.paymentAllocation.aggregate({
+    const paidPenaltyAgg = await this.prisma.paymentAllocation.aggregate({
       where: {
         installmentId,
         component: AllocationComponent.OVERDUE_PENALTY,
@@ -547,61 +548,68 @@ export class LoansService {
       },
       _sum: { amount: true },
     });
-    const alreadyPaid = new Decimal(paidPenalty._sum.amount ?? 0);
-    const removable = currentPenalty.minus(alreadyPaid).toDecimalPlaces(2);
-
-    if (removable.lte(0)) {
-      throw new BadRequestException(
-        'This penalty has already been fully paid and cannot be removed. Reverse the payment instead if you need to undo it.',
-      );
-    }
+    const paidPenalty = new Decimal(paidPenaltyAgg._sum.amount ?? 0);
 
     const notificationIds: string[] = [];
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.installment.update({
         where: { id: installmentId },
         data: {
-          penaltyAmount: { decrement: removable.toFixed(2) },
-          totalAmount: { decrement: removable.toFixed(2) },
+          penaltyAmount: 0,
+          totalAmount: { decrement: currentPenalty.toFixed(2) },
         },
       });
 
-      const updatedLoan = await tx.loan.update({
+      let updatedLoan = await tx.loan.update({
         where: { id: loanId },
-        data: { totalPayable: { decrement: removable.toFixed(2) } },
+        data: { totalPayable: { decrement: currentPenalty.toFixed(2) } },
       });
 
-      const refreshedInstallment = await tx.installment.findUniqueOrThrow({ where: { id: installmentId } });
-      const recomputedStatus = computeInstallmentStatus(
-        refreshedInstallment.totalAmount,
-        refreshedInstallment.paidAmount,
-        refreshedInstallment.dueDate,
-      );
-      const finalInstallment =
-        recomputedStatus === refreshedInstallment.status
-          ? refreshedInstallment
-          : await tx.installment.update({ where: { id: installmentId }, data: { status: recomputedStatus } });
+      const reassignedTo = paidPenalty.gt(0)
+        ? await this.reassignPaidPenalty(tx, loanId, installmentId, installment.sequence)
+        : [];
+
+      const freshInstallments = await tx.installment.findMany({ where: { loanId } });
+      for (const inst of freshInstallments) {
+        const recomputedStatus = computeInstallmentStatus(inst.totalAmount, inst.paidAmount, inst.dueDate);
+        if (recomputedStatus !== inst.status) {
+          await tx.installment.update({ where: { id: inst.id }, data: { status: recomputedStatus } });
+        }
+      }
+
+      const finalInstallments = await tx.installment.findMany({ where: { loanId } });
+      const finalInstallment = finalInstallments.find((i) => i.id === installmentId)!;
+
+      const outstanding = this.ledger.computeOutstanding(updatedLoan, finalInstallments);
+      if (
+        outstanding.lte(0) &&
+        finalInstallments.every((i) => i.status === 'PAID' || i.status === 'CANCELLED') &&
+        loan.status === 'ACTIVE'
+      ) {
+        updatedLoan = await tx.loan.update({ where: { id: loanId }, data: { status: 'COMPLETED' } });
+      }
 
       await tx.adjustment.create({
         data: {
           loanId,
           type: AdjustmentType.WAIVER,
-          amount: removable.toFixed(2),
+          amount: currentPenalty.toFixed(2),
           reason: dto.reason,
           staffId: staff.id,
         },
       });
 
-      const freshInstallments = await tx.installment.findMany({ where: { loanId } });
       await this.ledger.appendEntry(tx, {
         customerId: loan.customerId,
         loanId,
         entryType: LedgerEntryType.WAIVER,
-        credit: removable,
-        balanceAfter: this.ledger.computeOutstanding(updatedLoan, freshInstallments),
+        credit: currentPenalty,
+        balanceAfter: outstanding,
         referenceType: 'Installment',
         referenceId: installmentId,
-        description: `Penalty removed on EMI ${installment.sequence}: ${dto.reason}`,
+        description: paidPenalty.gt(0)
+          ? `Penalty removed on EMI ${installment.sequence}: ${dto.reason} (₹${paidPenalty.toFixed(2)} already paid was credited to ${reassignedTo.join(', ') || 'this EMI'})`
+          : `Penalty removed on EMI ${installment.sequence}: ${dto.reason}`,
       });
 
       await this.audit.record({
@@ -611,8 +619,8 @@ export class LoansService {
         action: 'INSTALLMENT_PENALTY_REVOKED',
         entityType: 'Installment',
         entityId: installmentId,
-        beforeState: { penaltyAmount: currentPenalty.toFixed(2) },
-        afterState: { penaltyAmount: finalInstallment.penaltyAmount.toFixed(2) },
+        beforeState: { penaltyAmount: currentPenalty.toFixed(2), paidPenalty: paidPenalty.toFixed(2) },
+        afterState: { penaltyAmount: '0.00', reassignedTo },
         reason: dto.reason,
       });
 
@@ -621,7 +629,7 @@ export class LoansService {
           event: NotificationEvent.PENALTY_REVOKED,
           customerId: loan.customerId,
           payload: {
-            amount: removable.toFixed(2),
+            amount: currentPenalty.toFixed(2),
             sequence: String(installment.sequence),
             loanNumber: loan.loanNumber,
           },
@@ -635,12 +643,113 @@ export class LoansService {
     return updated;
   }
 
+  /**
+   * Moves already-collected penalty money onto principal so it isn't lost
+   * when the penalty it paid for is removed - this EMI first (if it still
+   * has unpaid principal after the penalty is gone), then the next open
+   * EMIs in sequence. Rewrites the underlying PaymentAllocation rows (not
+   * just the paidAmount totals) so future payments' remaining-balance
+   * calculations stay accurate, splitting a row across installments when
+   * one EMI's remaining principal isn't enough to absorb it. Returns the
+   * EMI sequence numbers the money ended up on, for the audit trail.
+   */
+  private async reassignPaidPenalty(
+    tx: PrismaTx,
+    loanId: string,
+    fromInstallmentId: string,
+    fromSequence: number,
+  ): Promise<string[]> {
+    const targets = await tx.installment.findMany({
+      where: { loanId, sequence: { gte: fromSequence }, status: { not: 'CANCELLED' } },
+      orderBy: { sequence: 'asc' },
+    });
+
+    const rows = await tx.paymentAllocation.findMany({
+      where: {
+        installmentId: fromInstallmentId,
+        component: AllocationComponent.OVERDUE_PENALTY,
+        payment: { status: PaymentStatus.SUCCESSFUL },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const consumedByTarget = new Map<string, Decimal>();
+    const roomOn = async (targetId: string, principalAmount: Decimal.Value) => {
+      const agg = await tx.paymentAllocation.aggregate({
+        where: { installmentId: targetId, component: AllocationComponent.EMI_PRINCIPAL, payment: { status: PaymentStatus.SUCCESSFUL } },
+        _sum: { amount: true },
+      });
+      const base = new Decimal(principalAmount).minus(agg._sum.amount ?? 0);
+      return base.minus(consumedByTarget.get(targetId) ?? new Decimal(0));
+    };
+
+    const paidAmountDelta = new Map<string, Decimal>();
+    const bump = (id: string, delta: Decimal) => paidAmountDelta.set(id, (paidAmountDelta.get(id) ?? new Decimal(0)).plus(delta));
+    const touchedSequences = new Set<number>();
+
+    for (const row of rows) {
+      let rowRemaining = new Decimal(row.amount);
+      bump(fromInstallmentId, rowRemaining.neg());
+      let firstWrite = true;
+
+      for (const target of targets) {
+        if (rowRemaining.lte(0)) break;
+        const room = await roomOn(target.id, target.principalAmount);
+        if (room.lte(0)) continue;
+
+        const take = Decimal.min(room, rowRemaining);
+        if (firstWrite) {
+          await tx.paymentAllocation.update({
+            where: { id: row.id },
+            data: { installmentId: target.id, component: AllocationComponent.EMI_PRINCIPAL, amount: take.toFixed(2) },
+          });
+          firstWrite = false;
+        } else {
+          await tx.paymentAllocation.create({
+            data: { paymentId: row.paymentId, installmentId: target.id, component: AllocationComponent.EMI_PRINCIPAL, amount: take.toFixed(2) },
+          });
+        }
+
+        consumedByTarget.set(target.id, (consumedByTarget.get(target.id) ?? new Decimal(0)).plus(take));
+        bump(target.id, take);
+        touchedSequences.add(target.sequence);
+        rowRemaining = rowRemaining.minus(take);
+      }
+
+      if (rowRemaining.gt(0)) {
+        // Nowhere left to put it (the rest of the loan is already fully
+        // paid) - leave it as an unattached credit rather than pretend it
+        // paid for something it didn't.
+        if (firstWrite) {
+          await tx.paymentAllocation.update({
+            where: { id: row.id },
+            data: { installmentId: null, component: AllocationComponent.OTHER, amount: rowRemaining.toFixed(2) },
+          });
+        } else {
+          await tx.paymentAllocation.create({
+            data: { paymentId: row.paymentId, installmentId: null, component: AllocationComponent.OTHER, amount: rowRemaining.toFixed(2) },
+          });
+        }
+      }
+    }
+
+    for (const [instId, delta] of paidAmountDelta) {
+      if (delta.eq(0)) continue;
+      await tx.installment.update({ where: { id: instId }, data: { paidAmount: { increment: delta.toFixed(2) } } });
+    }
+
+    return [...touchedSequences].sort((a, b) => a - b).map((s) => `EMI ${s}`);
+  }
+
   /** Staff-initiated push reminder for one overdue installment, on top of the automatic daily sweep (EmiSchedulerService). */
   async notifyOverdueInstallment(loanId: string, installmentId: string, staff: AuthUser) {
     const loan = await this.findById(loanId, staff);
     const installment = loan.installments.find((i) => i.id === installmentId);
     if (!installment) throw new NotFoundException('Installment not found on this loan.');
-    if (installment.status !== 'OVERDUE') {
+    // Not just `status === 'OVERDUE'` - status gets stuck on PARTIALLY_PAID
+    // once any money lands on an EMI, even if its due date has since passed,
+    // so a partially-paid-but-overdue EMI needs its own reminder too.
+    if (installment.status === 'PAID' || installment.status === 'CANCELLED' || installment.dueDate >= new Date()) {
       throw new BadRequestException('This installment is not overdue.');
     }
 

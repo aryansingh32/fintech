@@ -29,8 +29,17 @@ export function summarizeLoan(loan: Loan): LoanSummary {
   const sorted = [...loan.installments].sort((a, b) => a.sequence - b.sequence);
   const nextInstallment = sorted.find((i) => openStatuses.includes(i.status)) ?? null;
 
+  // Not just `status === OVERDUE` - status gets stuck on PARTIALLY_PAID once
+  // any money lands on an EMI, even if its due date has since passed, so a
+  // partially-paid-but-overdue EMI would otherwise vanish from this total.
+  const now = Date.now();
   const overdueAmount = loan.installments
-    .filter((i) => i.status === InstallmentStatus.OVERDUE)
+    .filter(
+      (i) =>
+        i.status !== InstallmentStatus.PAID &&
+        i.status !== InstallmentStatus.CANCELLED &&
+        new Date(i.dueDate).getTime() < now,
+    )
     .reduce((sum, i) => sum + (Number(i.totalAmount) - Number(i.paidAmount)), 0);
 
   const installmentsPaid = loan.installments.filter((i) => i.status === InstallmentStatus.PAID).length;
