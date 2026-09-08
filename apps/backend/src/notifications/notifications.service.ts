@@ -233,9 +233,10 @@ export class NotificationsService {
     return candidates.length;
   }
 
-  private defaultChannelsFor(recipientType: NotificationRecipientType): NotificationChannel[] {
-    return recipientType === NotificationRecipientType.CUSTOMER
-      ? [NotificationChannel.IN_APP, NotificationChannel.PUSH]
-      : [NotificationChannel.IN_APP];
+  private defaultChannelsFor(_recipientType: NotificationRecipientType): NotificationChannel[] {
+    // Staff carry a registered push token exactly the same way customers do
+    // (see Device.pushToken) - there's no reason to only ever deliver
+    // IN_APP to them. Both recipient types get the same default channels.
+    return [NotificationChannel.IN_APP, NotificationChannel.PUSH];
   }
 }
