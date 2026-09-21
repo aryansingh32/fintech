@@ -17,23 +17,23 @@
         "buildType": "apk"
       },
       "env": {
-        "API_BASE_URL": "https://staging-api.sptcfinance.example.com"
+        "API_BASE_URL": "https://sptcfinance.duckdns.org"
       }
     },
     "production": {
-      "autoIncrement": "versionCode",
       "android": {
         "buildType": "app-bundle"
       },
       "env": {
-        "API_BASE_URL": "https://api.sptcfinance.example.com"
+        "API_BASE_URL": "https://sptcfinance.duckdns.org"
       }
     }
   },
   "submit": {
     "production": {
       "android": {
-        "track": "internal"
+        "track": "internal",
+        "serviceAccountKeyPath": "../../secrets/play-store-service-account.json"
       }
     }
   }

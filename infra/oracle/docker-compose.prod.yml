@@ -1,0 +1,62 @@
+# Production stack for a single Oracle Cloud "Always Free" VM: Postgres +
+# the NestJS backend + Caddy (automatic Let's Encrypt HTTPS, no certbot
+# cron needed). Run all commands from the repo root:
+#
+#   docker compose -f infra/oracle/docker-compose.prod.yml --env-file apps/backend/.env.production up -d --build
+#
+# Postgres and the backend are NOT published to the host - only Caddy
+# terminates 80/443 and reverse-proxies to the backend over the internal
+# docker network. DOMAIN must be a real DNS name (an A record) pointing at
+# this VM's public IP before first start, or Caddy cannot obtain a cert.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sptc-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: sptc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in apps/backend/.env.production}
+      POSTGRES_DB: sptc_finance
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sptc -d sptc_finance"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../../apps/backend
+      dockerfile: Dockerfile
+    container_name: sptc-backend
+    restart: always
+    env_file:
+      - ../../apps/backend/.env.production
+    environment:
+      DATABASE_URL: "postgresql://sptc:${POSTGRES_PASSWORD}@postgres:5432/sptc_finance?schema=public"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: sptc-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in apps/backend/.env.production, e.g. api.yourdomain.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

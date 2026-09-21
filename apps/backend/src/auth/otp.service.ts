@@ -21,16 +21,22 @@ class TooManyRequestsException extends HttpException {
 export interface OtpRequestResult {
   requestId: string;
   expiresAt: Date;
-  /** Only ever populated outside production, when no real SMS provider is configured. */
+  /**
+   * Only populated when no real SMS provider is configured - normally that
+   * means outside production, but ALLOW_DEV_OTP=true also allows it in
+   * production for deployments that haven't set up a real SMS provider yet
+   * (the OTP is then visible in the API response - see ALLOW_DEV_OTP in
+   * .env.production.example for the tradeoff).
+   */
   devOtp?: string;
 }
 
 /**
  * Centralizes OTP issuance/verification with rate limiting and abuse
  * protection (blueprint #4.1, #14, #61 test "OTP rate limiting").
- * Never marks an OTP as "sent" unless a real provider is configured; in a
- * provider-less dev sandbox it surfaces the code out-of-band for testing
- * instead of pretending delivery happened.
+ * Never marks an OTP as "sent" unless a real provider is configured; without
+ * one, it surfaces the code out-of-band (devOtp) instead of pretending
+ * delivery happened - gated to non-production unless ALLOW_DEV_OTP=true.
  */
 @Injectable()
 export class OtpService {
@@ -93,14 +99,15 @@ export class OtpService {
       return { requestId: attempt.id, expiresAt };
     }
 
-    if (this.config.get('NODE_ENV') === 'production') {
+    const allowDevOtp = this.config.get('ALLOW_DEV_OTP') === 'true';
+    if (this.config.get('NODE_ENV') === 'production' && !allowDevOtp) {
       throw new ServiceUnavailableException(
         'SMS provider not configured. Cannot deliver verification codes.',
       );
     }
 
     this.logger.warn(
-      `SMS provider not configured (dev mode) - OTP for ${this.maskMobile(mobile)}: ${otp}`,
+      `SMS provider not configured (${allowDevOtp ? 'ALLOW_DEV_OTP' : 'dev mode'}) - OTP for ${this.maskMobile(mobile)}: ${otp}`,
     );
     return { requestId: attempt.id, expiresAt, devOtp: otp };
   }

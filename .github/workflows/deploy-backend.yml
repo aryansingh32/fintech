@@ -1,0 +1,26 @@
+name: Deploy backend to Oracle VM
+
+# Manual by default - deploying to a live financial backend shouldn't
+# happen automatically on every push. Trigger from the Actions tab, or
+# uncomment the push trigger below once you're confident in the flow.
+on:
+  workflow_dispatch: {}
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'apps/backend/**'
+  #     - 'infra/oracle/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_SSH_HOST }}
+          username: ${{ secrets.ORACLE_SSH_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          script: |
+            cd /opt/sptc-finance
+            ./infra/oracle/deploy.sh

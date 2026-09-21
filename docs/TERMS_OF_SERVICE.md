@@ -1,13 +1,14 @@
 # SPTC Finance - Terms of Service
 
-**Effective date:** [FILL IN BEFORE PUBLISHING]
-**Operator:** [FILL IN: legal entity name, registration details, address]
+**Effective date:** September 12, 2026
+**Operator:** SPTC Finance, India. Contact: jainarpit0064@gmail.com
 
-> This is a drafting template, not a substitute for legal review. Consumer
-> lending is regulated - have a qualified lawyer adapt this to your actual
-> entity, jurisdiction, licensing (e.g. NBFC/lending license), and interest
-> rate/fee disclosure requirements before publishing it. Replace every
-> `[FILL IN ...]` placeholder.
+> This document has been filled in with the operator's real identity and
+> jurisdiction as of the effective date above, but it has not had a
+> qualified lawyer's review. Consumer lending is regulated - have a lawyer
+> adapt this to your actual licensing (e.g. NBFC/lending license) and
+> interest rate/fee disclosure requirements before relying on it for a
+> public launch handling real loans at scale.
 
 ## 1. Acceptance
 
@@ -18,7 +19,7 @@ App, you agree to these Terms and to our [Privacy Policy](./PRIVACY_POLICY.md).
 
 You must be at least 18 years old and legally capable of entering into a
 credit agreement to use the Customer App. Business App access is limited to
-staff authorized by [FILL IN legal entity].
+staff authorized by SPTC Finance.
 
 ## 3. The service
 
@@ -34,9 +35,9 @@ approved - later changes to a loan product do not affect an existing loan.
   accuracy of information you submit.
 - Keep your PIN, password, and device secure; notify us immediately of any
   unauthorized access.
-- Pay EMIs by their due dates. Late payment may incur [FILL IN: late fee
-  policy] and may be reported to credit bureaus as applicable under [FILL
-  IN: local regulation].
+- Pay EMIs by their due dates. Late payment may incur a late fee as
+  disclosed on your loan agreement at origination, and may be reported to
+  credit bureaus as permitted under applicable Indian regulation.
 
 ## 5. Payments
 
@@ -48,24 +49,30 @@ recorded and settled exactly once.
 
 ## 6. Cancellation, disputes, and reversals
 
-Payment disputes are reviewed by [FILL IN entity]; approved corrections are
-recorded as reversals, not as edits to the original transaction record, so
-your full payment history always remains visible.
+Payment disputes are reviewed by SPTC Finance's support team; approved
+corrections are recorded as reversals, not as edits to the original
+transaction record, so your full payment history always remains visible.
 
 ## 7. Termination
 
 We may suspend or close an account for fraud, non-payment, or violation of
-these Terms, subject to [FILL IN: any regulatory notice requirements before
-account action].
+these Terms. Where applicable Indian regulation requires advance notice
+before an account action, we will provide it.
 
 ## 8. Limitation of liability
 
-[FILL IN: standard limitation-of-liability clause consistent with your
-jurisdiction and lending license conditions.]
+To the maximum extent permitted by applicable law, SPTC Finance is not
+liable for indirect, incidental, or consequential damages arising from use
+of the app. Nothing in these Terms limits liability that cannot be excluded
+under applicable Indian law, including in connection with fraud or gross
+negligence. Our total liability for any claim arising from the service is
+limited to the fees paid by you in connection with the loan giving rise to
+the claim.
 
 ## 9. Governing law
 
-These Terms are governed by the laws of [FILL IN jurisdiction].
+These Terms are governed by the laws of India, and disputes are subject to
+the exclusive jurisdiction of the courts of India.
 
 ## 10. Changes
 
@@ -74,5 +81,5 @@ taking effect.
 
 ## 11. Contact
 
-[FILL IN: support email, physical address, grievance/nodal officer if
-required by local regulation]
+Email: jainarpit0064@gmail.com. This is the point of contact for support
+requests and grievances related to these Terms.

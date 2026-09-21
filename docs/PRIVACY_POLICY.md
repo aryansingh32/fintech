@@ -1,17 +1,19 @@
 # SPTC Finance - Privacy Policy
 
-**Effective date:** [FILL IN BEFORE PUBLISHING]
-**Operator:** [FILL IN: legal entity name, registered address, contact email]
+**Effective date:** September 12, 2026
+**Operator:** SPTC Finance, India. Contact: jainarpit0064@gmail.com
 
-> This is a drafting template, not a substitute for legal review. Have a
-> qualified lawyer review it against your actual entity, jurisdiction (this
-> product handles consumer credit/KYC, which is regulated), and Google Play
-> policy before publishing it. Replace every `[FILL IN ...]` placeholder.
+> This policy has been filled in with the operator's real identity and
+> infrastructure as of the effective date above, but it has not had a
+> qualified lawyer's review. Have one review it against your registered
+> entity, jurisdiction (this product handles consumer credit/KYC, which is
+> regulated in India under RBI/NBFC norms), and Google Play policy before
+> relying on it for a public launch handling real customer data at scale.
 
 ## 1. Who this applies to
 
 This policy covers the SPTC Finance Customer App and Business App, and the
-backend services that power them, operated by [FILL IN legal entity].
+backend services that power them, operated by SPTC Finance.
 
 ## 2. Information we collect
 
@@ -43,8 +45,8 @@ financing service.
 
 - To create and service loan accounts: origination, EMI scheduling, payment
   collection, receipts, and collections/reminders.
-- To verify identity (KYC) as required by [FILL IN: applicable regulation,
-  e.g. RBI/NBFC KYC norms].
+- To verify identity (KYC) as required by applicable Indian regulation
+  (RBI/NBFC KYC norms).
 - To secure accounts: OTP verification, device recognition, rate limiting
   against brute-force/abuse.
 - To send transactional notifications (EMI due, payment received, receipt
@@ -61,29 +63,32 @@ advertising.
 
 | Provider | Data shared | Purpose |
 |---|---|---|
-| Twilio (SMS) | Mobile number, message content (OTP code / EMI reminder text) | Delivering SMS OTPs and reminders |
+| Twilio (SMS) | Mobile number, message content (OTP code / EMI reminder text) | Delivering SMS OTPs and reminders. Not yet live in all environments - see the app's current OTP delivery method, which may temporarily display the code in-app instead. |
 | Expo (push notifications) | Push token, notification title/body | Delivering push notifications |
 | Razorpay (payment gateway) | Name, contact number, email (if provided), payment amount, loan/payment reference | Processing online EMI payments |
-| [FILL IN: cloud hosting provider] | All data described above, encrypted at rest and in transit | Hosting the database and backend service |
+| Oracle Cloud Infrastructure | All data described above, encrypted in transit (TLS) | Hosting the backend service and database |
+| Cloudflare (R2 storage) | KYC document images, encrypted database backups | Object storage for uploads and nightly encrypted backups, encrypted at rest by the provider |
 
 Each provider processes data only as needed to deliver its specific service
-and under its own privacy/security terms ([FILL IN links to each provider's
-DPA/privacy policy]).
+and under its own privacy/security terms: [Twilio](https://www.twilio.com/en-us/legal/privacy),
+[Expo](https://expo.dev/privacy), [Razorpay](https://razorpay.com/privacy/),
+[Oracle Cloud](https://www.oracle.com/legal/privacy/), [Cloudflare](https://www.cloudflare.com/privacypolicy/).
 
 ## 5. Data retention
 
 Financial records (loans, payments, receipts, ledger entries) are retained
-for [FILL IN: your regulatory retention period, commonly 8-10 years for
-lending records] to meet audit and regulatory obligations. Support tickets
-and device records are retained for [FILL IN]. Data is deleted or anonymized
-after the retention period unless a longer period is legally required.
+for 8 years from account closure to meet audit and regulatory obligations
+common to consumer lending in India. Support tickets and device records are
+retained for 3 years. Data is deleted or anonymized after the retention
+period unless a longer period is legally required.
 
 ## 6. Your rights
 
 Customers may request a copy of their data, request correction of inaccurate
 data, or request account closure (subject to any outstanding loan
-obligations and regulatory retention requirements) by contacting [FILL IN:
-support email/phone]. Staff accounts are managed by their employing branch.
+obligations and regulatory retention requirements) by contacting
+jainarpit0064@gmail.com. Staff accounts are managed by their employing
+branch.
 
 ## 7. Security
 
@@ -92,8 +97,7 @@ plain text. All traffic between the apps and the backend is encrypted
 (HTTPS/TLS). Access to customer and staff data is role-based and every
 sensitive action is recorded in an append-only audit log. KYC documents are
 referenced by pointer, not embedded in general application data, and stored
-in [FILL IN: your document storage provider and its encryption-at-rest
-guarantee].
+in Cloudflare R2, encrypted at rest by the provider.
 
 ## 8. Children's privacy
 
@@ -107,5 +111,6 @@ users in-app before the change takes effect.
 
 ## 10. Contact
 
-[FILL IN: support email, physical address, grievance officer if required by
-local regulation]
+Email: jainarpit0064@gmail.com. This is the point of contact for privacy
+requests, data access/correction/deletion requests, and grievances related
+to this policy.

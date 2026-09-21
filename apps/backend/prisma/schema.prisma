@@ -928,6 +928,45 @@ model CollectionAssignment {
 }
 
 // ============================================================================
+// BACKUP
+// ============================================================================
+
+enum BackupTrigger {
+  SCHEDULED
+  MANUAL
+}
+
+enum BackupStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+// One row per daily/manual backup attempt (BackupService). Kept even for
+// FAILED runs so a gap in daily backups is visible in the app, not just in
+// server logs - see the SETTINGS_MANAGE-gated GET /v1/backups endpoint.
+model BackupRun {
+  id                 String        @id @default(uuid())
+  trigger            BackupTrigger
+  status             BackupStatus
+  startedAt          DateTime
+  finishedAt         DateTime?
+  sizeBytes          Int?
+  objectKey          String?
+  prunedKeys         String[]      @default([])
+  errorMessage       String?
+  triggeredByStaffId String?
+  // Set only when a SUPER_ADMIN manually exports this specific run to
+  // Google Drive from the Business App (BackupService.sendToDrive) - the
+  // nightly job never does this automatically.
+  driveFileId        String?
+  sentToDriveAt      DateTime?
+  createdAt          DateTime      @default(now())
+
+  @@index([startedAt])
+}
+
+// ============================================================================
 // AUDIT
 // ============================================================================
 

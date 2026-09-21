@@ -14,6 +14,7 @@ import {
   AllocationPreview,
   AppNotification,
   AuditEvent,
+  BackupRun,
   Customer,
   CustomerListItem,
   CustomerSummary,
@@ -434,6 +435,17 @@ export class ApiClient {
         purpose,
         contentType,
       }),
+  };
+
+  // ---------------------------------------------------------------------
+  // Daily database backups (Business App, SUPER_ADMIN only)
+  // ---------------------------------------------------------------------
+  backups = {
+    list: (range?: { from?: string; to?: string }) =>
+      this.request<BackupRun[]>('GET', '/backups', undefined, { query: { from: range?.from, to: range?.to } }),
+    run: () => this.request<{ id: string; status: string }>('POST', '/backups/run'),
+    getDownloadUrl: (id: string) => this.request<{ url: string; filename: string }>('GET', `/backups/${id}/download`),
+    sendToDrive: (id: string) => this.request<BackupRun>('POST', `/backups/${id}/send-to-drive`),
   };
 
   // ---------------------------------------------------------------------

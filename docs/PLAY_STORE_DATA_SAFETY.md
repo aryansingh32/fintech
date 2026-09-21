@@ -18,7 +18,7 @@ types?" → Yes.**
 |---|---|---|---|---|
 | Name | Yes | No | Account management, App functionality | Customer/staff full name |
 | Email address | Customer App: Yes (optional field) | No | Account management | Optional at signup |
-| Phone number | Yes | Yes (Twilio) | Account management, App functionality | Used for OTP login and SMS reminders |
+| Phone number | Yes | Yes, once Twilio is configured | Account management, App functionality | Used for OTP login and SMS reminders. Update this answer once a real SMS provider is live - see the deployment runbook |
 | Physical address | Customer App: Yes | No | App functionality | Loan/KYC address fields |
 | National ID / government ID | Customer App: Yes | No | App functionality | KYC document type + masked identifier + a reference to securely stored document image, not the raw ID itself, is what backend rows hold |
 
@@ -52,8 +52,8 @@ for all of these in the Play Console form.
 ## Security practices section
 
 - Data is encrypted in transit: **Yes** (HTTPS/TLS enforced by the backend).
-- Data is encrypted at rest: depends on your database/hosting
-  provider's configuration - **verify and answer per your actual deployment**.
+- Data is encrypted at rest: **Yes** (Oracle Cloud block storage and
+  Cloudflare R2 both encrypt data at rest by default).
 - You can request data deletion: **Yes** (see Privacy Policy §6) - answer
   Yes and link the privacy policy.
 - Committed to following the Play Families policy: **N/A** - this app is
@@ -63,11 +63,13 @@ for all of these in the Play Console form.
 
 - **Twilio** - SMS delivery (phone number + message content).
 - **Razorpay** - payment processing (name/contact/payment amount).
-- **Expo (push notification infra)** - push token + notification content is
-  relayed through Expo's push service to APNs/FCM; declare it under
-  "Analytics"/"App functionality" per Play's current taxonomy for push
-  infrastructure providers.
-- **[FILL IN: your hosting/database provider]**.
+- **Firebase Cloud Messaging (Google)** - push token + notification content,
+  used to deliver push notifications directly to Android devices (declare
+  under "App functionality" per Play's current taxonomy for push
+  infrastructure providers).
+- **Oracle Cloud Infrastructure** - hosts the backend service and database.
+- **Cloudflare (R2)** - object storage for KYC document uploads and
+  encrypted database backups.
 
 Before submitting, re-verify this table against whatever the current Play
 Console form fields actually ask (Google revises the taxonomy periodically)

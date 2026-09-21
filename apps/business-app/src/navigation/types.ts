@@ -31,6 +31,7 @@ export type RootStackParamList = {
   InventoryProducts: undefined;
   AgreementTemplatesAdmin: undefined;
   StaffManagement: undefined;
+  Backups: undefined;
   Profile: undefined;
   SecurityDevices: undefined;
   Notifications: undefined;

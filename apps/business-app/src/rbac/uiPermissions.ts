@@ -42,6 +42,18 @@ export function isGlobalRole(_role: StaffRole): boolean {
   return true;
 }
 
+/**
+ * A genuine (non-hardcoded) role check, unlike every function above.
+ * Backups expose the entire raw database and can export a copy to an
+ * external Google Drive account, so - unlike the rest of this app - that
+ * screen is deliberately kept SUPER_ADMIN-only. The backend enforces this
+ * independently (see backend BackupController's @Roles guard); this is
+ * just so the menu entry doesn't appear for everyone else.
+ */
+export function isSuperAdmin(role: StaffRole): boolean {
+  return role === StaffRole.SUPER_ADMIN;
+}
+
 export function roleLabel(role: StaffRole): string {
   return role
     .split('_')

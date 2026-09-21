@@ -49,6 +49,24 @@ export function validateProductionEnv(env: NodeJS.ProcessEnv): void {
     problems.push(`Unsupported STORAGE_PROVIDER "${env.STORAGE_PROVIDER}" - only "r2" is implemented.`);
   }
 
+  // Backups are mandatory in production - this is a financial ledger, not
+  // something to run without a tested daily copy. BACKUP_R2_BUCKET_NAME
+  // must be a SEPARATE, private bucket from R2_BUCKET_NAME (which is
+  // served publicly via R2_PUBLIC_BASE_URL) so encrypted backups are never
+  // reachable by a guessable public URL.
+  if (isWeakSecret(env.BACKUP_ENCRYPTION_PASSPHRASE)) {
+    problems.push('BACKUP_ENCRYPTION_PASSPHRASE is missing, too short, or a placeholder value.');
+  }
+  if (!env.BACKUP_R2_BUCKET_NAME) {
+    problems.push('BACKUP_R2_BUCKET_NAME is not set - daily database backups have nowhere to go.');
+  }
+  if (env.BACKUP_R2_BUCKET_NAME && env.BACKUP_R2_BUCKET_NAME === env.R2_BUCKET_NAME) {
+    problems.push('BACKUP_R2_BUCKET_NAME must be a different, private bucket from R2_BUCKET_NAME (which is public via R2_PUBLIC_BASE_URL).');
+  }
+  if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY) {
+    problems.push('R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY are required for backups even if STORAGE_PROVIDER is unset.');
+  }
+
   if (problems.length > 0) {
     throw new Error(
       `Refusing to start in production with an unsafe configuration:\n` +

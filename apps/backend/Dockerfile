@@ -22,6 +22,20 @@ FROM base AS runtime
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
 
+# postgresql-client-16 (to match the sptc-postgres server major version exactly -
+# pg_dump from an older client against a newer server is unsupported and can
+# fail or silently miss objects) from the official PGDG apt repo, since
+# Debian bookworm's own repo only ships postgresql-client-15. Used by
+# BackupService to produce the nightly encrypted database dump.
+RUN apt-get update && apt-get install -y --no-install-recommends wget gnupg ca-certificates \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && wget -qO /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-16 \
+    && apt-get purge -y --auto-remove wget gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 COPY prisma ./prisma
 RUN npm install --omit=dev && npx prisma generate && npm cache clean --force

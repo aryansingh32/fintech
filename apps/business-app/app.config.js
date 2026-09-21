@@ -33,10 +33,11 @@ module.exports = {
       googleWebClientId:
         process.env.GOOGLE_WEB_CLIENT_ID ?? '780616935214-sbtmvn04cj27r6evcckipgmlvfvietc2.apps.googleusercontent.com',
       eas: {
-        projectId: 'REPLACE_WITH_EAS_PROJECT_ID',
+        projectId: 'a3917f9d-813c-47eb-967c-5139009df5b5',
       },
     },
     plugins: [
+      'expo-asset',
       '@react-native-google-signin/google-signin',
       [
         'expo-notifications',

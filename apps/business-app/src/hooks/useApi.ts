@@ -535,3 +535,33 @@ export function useMarkAllNotificationsRead() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 }
+
+// ---------------------------------------------------------------------
+// Database backups (SUPER_ADMIN only)
+// ---------------------------------------------------------------------
+export function useBackups(range?: { from?: string; to?: string }) {
+  return useQuery({
+    queryKey: ['backups', range?.from ?? null, range?.to ?? null],
+    queryFn: () => apiClient.backups.list(range),
+  });
+}
+
+export function useRunBackup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.backups.run(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['backups'] }),
+  });
+}
+
+export function useBackupDownloadUrl() {
+  return useMutation({ mutationFn: (id: string) => apiClient.backups.getDownloadUrl(id) });
+}
+
+export function useSendBackupToDrive() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.backups.sendToDrive(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['backups'] }),
+  });
+}

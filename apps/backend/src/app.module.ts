@@ -23,6 +23,7 @@ import { ReceiptsModule } from './receipts/receipts.module';
 import { StorageModule } from './storage/storage.module';
 import { AgreementsModule } from './agreements/agreements.module';
 import { StaffModule } from './staff/staff.module';
+import { BackupModule } from './backup/backup.module';
 import { FirebaseAdminModule } from './firebase/firebase-admin.module';
 import { AppController } from './app.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -53,6 +54,7 @@ import { AccessGuard } from './common/guards/access.guard';
     StorageModule,
     AgreementsModule,
     StaffModule,
+    BackupModule,
   ],
   controllers: [AppController],
   providers: [

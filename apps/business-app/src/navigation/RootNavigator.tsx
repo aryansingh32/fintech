@@ -23,6 +23,7 @@ import { StaffSupportChatScreen } from '@/screens/support/StaffSupportChatScreen
 import { LoanProductsAdminScreen } from '@/screens/settings/LoanProductsAdminScreen';
 import { AgreementTemplatesAdminScreen } from '@/screens/settings/AgreementTemplatesAdminScreen';
 import { StaffManagementScreen } from '@/screens/settings/StaffManagementScreen';
+import { BackupsScreen } from '@/screens/settings/BackupsScreen';
 import { ReportsTabScreen } from '@/screens/reports/ReportsTabScreen';
 import { InventoryProductsScreen } from '@/screens/settings/InventoryProductsScreen';
 import { NotificationsScreen } from '@/screens/settings/NotificationsScreen';
@@ -79,6 +80,7 @@ export function RootNavigator() {
           <Stack.Screen name="LoanProductsAdmin" component={LoanProductsAdminScreen} options={{ title: 'Loan Products' }} />
           <Stack.Screen name="AgreementTemplatesAdmin" component={AgreementTemplatesAdminScreen} options={{ title: 'Agreements' }} />
           <Stack.Screen name="StaffManagement" component={StaffManagementScreen} options={{ title: 'Staff & Approvals' }} />
+          <Stack.Screen name="Backups" component={BackupsScreen} options={{ title: 'Database Backups' }} />
           <Stack.Screen name="Reports" component={ReportsTabScreen} options={{ title: 'Reports' }} />
           <Stack.Screen name="InventoryProducts" component={InventoryProductsScreen} options={{ title: 'Inventory' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />

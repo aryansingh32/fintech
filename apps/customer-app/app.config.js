@@ -15,7 +15,7 @@ module.exports = {
     assetBundlePatterns: ['**/*'],
     android: {
       package: 'com.sptcfinance.customer',
-      versionCode: 1,
+      versionCode: 2,
       googleServicesFile: './android/app/google-services.json',
       permissions: [
         'USE_BIOMETRIC',
@@ -35,10 +35,11 @@ module.exports = {
       googleWebClientId:
         process.env.GOOGLE_WEB_CLIENT_ID ?? '780616935214-sbtmvn04cj27r6evcckipgmlvfvietc2.apps.googleusercontent.com',
       eas: {
-        projectId: 'REPLACE_WITH_EAS_PROJECT_ID',
+        projectId: '91722e95-b7ff-4cfa-b214-0181895da18d',
       },
     },
     plugins: [
+      'expo-asset',
       '@react-native-google-signin/google-signin',
       'expo-image-picker',
       'expo-local-authentication',

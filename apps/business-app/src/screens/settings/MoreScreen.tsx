@@ -13,6 +13,7 @@ import {
   canManageCustomersAndLoans,
   canUseSupport,
   canViewReports,
+  isSuperAdmin,
   roleLabel,
 } from '@/rbac/uiPermissions';
 import { MainTabParamList, RootStackParamList } from '@/navigation/types';
@@ -48,6 +49,9 @@ export function MoreScreen() {
       ) : null}
       {identity && canManageBranchesAndStaff(identity.role) ? (
         <MenuRow label="Manage Staff & Approvals" onPress={() => navigation.navigate('StaffManagement')} />
+      ) : null}
+      {identity && isSuperAdmin(identity.role) ? (
+        <MenuRow label="Database Backups" onPress={() => navigation.navigate('Backups')} />
       ) : null}
       <MenuRow label="Profile & Logout" onPress={() => navigation.navigate('Profile')} />
     </ScrollView>

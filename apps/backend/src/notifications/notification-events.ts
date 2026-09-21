@@ -26,6 +26,7 @@ export enum NotificationEvent {
   PENALTY_APPLIED = 'PENALTY_APPLIED',
   PENALTY_REVOKED = 'PENALTY_REVOKED',
   PAYMENT_RECEIVED_STAFF = 'PAYMENT_RECEIVED_STAFF',
+  BACKUP_FAILED = 'BACKUP_FAILED',
 }
 
 export type SupportedLocale = 'en' | 'hi';
@@ -169,6 +170,13 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationEvent, NotificationTempl
     body: {
       en: 'Your {{documentType}} could not be verified: {{reason}}. Please visit your SPTC Finance store.',
       hi: 'आपका {{documentType}} सत्यापित नहीं हो सका: {{reason}}। कृपया अपने SPTC Finance स्टोर पर जाएं।',
+    },
+  },
+  [NotificationEvent.BACKUP_FAILED]: {
+    title: { en: 'Database backup failed', hi: 'डेटाबेस बैकअप विफल हुआ' },
+    body: {
+      en: 'Tonight\'s automatic backup did not complete: {{reason}}. Please check the server soon.',
+      hi: 'आज रात का स्वचालित बैकअप पूरा नहीं हुआ: {{reason}}। कृपया जल्द ही सर्वर की जांच करें।',
     },
   },
 };

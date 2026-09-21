@@ -414,3 +414,22 @@ export interface OverdueAgingRow {
   daysOverdue: number;
   overdueAmount: Money;
 }
+
+export type BackupTrigger = 'SCHEDULED' | 'MANUAL';
+export type BackupStatus = 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+
+export interface BackupRun {
+  id: string;
+  trigger: BackupTrigger;
+  status: BackupStatus;
+  startedAt: IsoDateString;
+  finishedAt: IsoDateString | null;
+  sizeBytes: number | null;
+  objectKey: string | null;
+  prunedKeys: string[];
+  errorMessage: string | null;
+  triggeredByStaffId: string | null;
+  driveFileId: string | null;
+  sentToDriveAt: IsoDateString | null;
+  createdAt: IsoDateString;
+}

@@ -8,6 +8,12 @@ const validEnv = {
   CORS_ORIGINS: 'https://app.example.com',
   SMS_PROVIDER: 'twilio',
   PAYMENT_GATEWAY_PROVIDER: 'razorpay',
+  BACKUP_ENCRYPTION_PASSPHRASE: 'd'.repeat(40),
+  BACKUP_R2_BUCKET_NAME: 'sptc-finance-backups',
+  R2_BUCKET_NAME: 'sptc-finance-storage',
+  R2_ACCOUNT_ID: 'account-id',
+  R2_ACCESS_KEY_ID: 'access-key',
+  R2_SECRET_ACCESS_KEY: 'secret-key',
 } as NodeJS.ProcessEnv;
 
 describe('validateProductionEnv', () => {
@@ -58,5 +64,23 @@ describe('validateProductionEnv', () => {
     expect(() =>
       validateProductionEnv({ ...validEnv, SMS_PROVIDER: '', PAYMENT_GATEWAY_PROVIDER: '' }),
     ).not.toThrow();
+  });
+
+  it('rejects a missing backup encryption passphrase', () => {
+    expect(() => validateProductionEnv({ ...validEnv, BACKUP_ENCRYPTION_PASSPHRASE: '' })).toThrow(/BACKUP_ENCRYPTION_PASSPHRASE/);
+  });
+
+  it('rejects a missing backup bucket', () => {
+    expect(() => validateProductionEnv({ ...validEnv, BACKUP_R2_BUCKET_NAME: '' })).toThrow(/BACKUP_R2_BUCKET_NAME/);
+  });
+
+  it('rejects the backup bucket being the same as the public storage bucket', () => {
+    expect(() =>
+      validateProductionEnv({ ...validEnv, BACKUP_R2_BUCKET_NAME: 'sptc-finance-storage' }),
+    ).toThrow(/different, private bucket/);
+  });
+
+  it('rejects missing R2 credentials even when STORAGE_PROVIDER is unset', () => {
+    expect(() => validateProductionEnv({ ...validEnv, R2_ACCOUNT_ID: '' })).toThrow(/R2_ACCOUNT_ID/);
   });
 });
