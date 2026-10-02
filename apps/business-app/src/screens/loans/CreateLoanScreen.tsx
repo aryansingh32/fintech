@@ -31,7 +31,7 @@ export function CreateLoanScreen() {
   const [selectedDeviceLabel, setSelectedDeviceLabel] = useState<string | undefined>();
   const identifiers = useIdentifierSearch(imeiQuery);
 
-  const [showNewDeviceForm, setShowNewDeviceForm] = useState(false);
+  const [showNewDeviceForm, setShowNewDeviceForm] = useState(true);
   const [newBrand, setNewBrand] = useState('');
   const [newModel, setNewModel] = useState('');
   const [newSpecs, setNewSpecs] = useState('');
@@ -144,45 +144,9 @@ export function CreateLoanScreen() {
           </Text>
         ) : null}
       </Card>
-
       <Card style={{ marginTop: spacing.lg }}>
-        <Text style={styles.label}>Product Device (IMEI/Serial) - optional</Text>
-        <TextInput
-          value={imeiQuery}
-          onChangeText={setImeiQuery}
-          placeholder="Search IMEI or serial..."
-          placeholderTextColor={colors.textSecondary}
-          style={styles.input}
-        />
-        {identifiers.data?.map((identifier) => (
-          <Pressable
-            key={identifier.id}
-            onPress={() => {
-              setProductIdentifierId(identifier.id);
-              setSelectedDeviceLabel(undefined);
-            }}
-            style={[styles.identifierRow, productIdentifierId === identifier.id && styles.identifierRowSelected]}
-          >
-            <Text style={styles.body}>
-              {identifier.product?.brand} {identifier.product?.model} · {identifier.imei1 ?? identifier.serialNumber}
-            </Text>
-            <Text style={styles.caption}>{identifier.status}</Text>
-          </Pressable>
-        ))}
-
-        {selectedDeviceLabel ? (
-          <View style={[styles.identifierRow, styles.identifierRowSelected]}>
-            <Text style={styles.body}>{selectedDeviceLabel}</Text>
-            <Text style={styles.caption}>New device</Text>
-          </View>
-        ) : null}
-
-        {!showNewDeviceForm ? (
-          <Pressable onPress={() => setShowNewDeviceForm(true)} style={{ marginTop: spacing.md }}>
-            <Text style={styles.linkText}>+ Can't find it? Register a new device</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.newDeviceForm}>
+        {showNewDeviceForm ? (
+          <View>
             <Text style={styles.label}>Product Details (optional)</Text>
             <TextInput
               value={newBrand}
@@ -231,31 +195,26 @@ export function CreateLoanScreen() {
               placeholderTextColor={colors.textSecondary}
               style={[styles.input, { marginTop: spacing.sm }]}
             />
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
-              <View style={{ flex: 1 }}>
-                <PrimaryButton
-                  label="Cancel"
-                  variant="secondary"
-                  onPress={() => {
-                    setShowNewDeviceForm(false);
-                    setNewBrand('');
-                    setNewModel('');
-                    setNewSpecs('');
-                    setNewImei1('');
-                    setNewImei2('');
-                    setNewSerial('');
-                  }}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <PrimaryButton
-                  label="Save Device"
-                  onPress={onSaveNewDevice}
-                  loading={savingDevice}
-                  disabled={!newBrand.trim() || !newModel.trim()}
-                />
-              </View>
+            <View style={{ marginTop: spacing.md }}>
+              <PrimaryButton
+                label="Save Product Details"
+                onPress={onSaveNewDevice}
+                loading={savingDevice}
+                disabled={!newBrand.trim() || !newModel.trim()}
+              />
             </View>
+          </View>
+        ) : (
+          <View style={[styles.identifierRow, styles.identifierRowSelected]}>
+            <Text style={styles.body}>{selectedDeviceLabel}</Text>
+            <Text style={styles.caption}>Product saved</Text>
+            <Pressable onPress={() => {
+              setShowNewDeviceForm(true);
+              setSelectedDeviceLabel(undefined);
+              setProductIdentifierId(undefined);
+            }} style={{ marginTop: spacing.sm }}>
+              <Text style={styles.linkText}>Edit Product</Text>
+            </Pressable>
           </View>
         )}
       </Card>

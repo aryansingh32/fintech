@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "780616935214-r378egf6dn8krcagqg58v99eof52qnoe.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sptcfinance.business",
+            "certificate_hash": "b92f5ebb24e7f17bdcfcf7ab53946ee8f368ff73"
+          }
+        },
+        {
           "client_id": "780616935214-sbtmvn04cj27r6evcckipgmlvfvietc2.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -50,6 +58,14 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "780616935214-69k0l6ugkrpfjvlqt1f1fp8lltl7o3pc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sptcfinance.customer",
+            "certificate_hash": "610309b31d466b1c60fe460a8d1c99f650ec777a"
+          }
+        },
         {
           "client_id": "780616935214-mjq393ds957rjoqh11m8of3qu02h1pu4.apps.googleusercontent.com",
           "client_type": 1,

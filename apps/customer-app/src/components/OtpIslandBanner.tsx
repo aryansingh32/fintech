@@ -20,12 +20,14 @@ const OtpBannerContext = createContext<OtpBannerContextValue>({ showOtp: () => {
 export const useOtpBanner = () => useContext(OtpBannerContext);
 
 const TOP_OFFSET = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) + 8 : 54;
-const VISIBLE_MS = 6000;
+const VISIBLE_MS = 5000;
 const COLLAPSED_WIDTH = 126;
 const COLLAPSED_HEIGHT = 37;
 const EXPANDED_WIDTH = 272;
 const EXPANDED_HEIGHT = 64;
-const randomDelayMs = () => 2000 + Math.random() * 3000;
+// Delay between successive OTP requests - gives the "SMS delivery" illusion.
+// Kept at 2-4 s so it feels real but doesn't make the login flow sluggish.
+const randomDelayMs = () => 2000 + Math.random() * 2000;
 
 export function OtpIslandBannerProvider({ children }: { children: React.ReactNode }) {
   const [otp, setOtp] = useState<string | null>(null);
@@ -51,13 +53,16 @@ export function OtpIslandBannerProvider({ children }: { children: React.ReactNod
         setOtp(code);
         setLabel(options?.label ?? 'SPTC Finance · OTP');
         setMounted(true);
-        options?.onDelivered?.();
         // Shape expands first (the island "growing"); content only starts
         // fading in once the capsule is mostly open, never both at once.
+        // onDelivered fires after the expand animation finishes so the user
+        // actually sees the OTP displayed before auto-fill/submit triggers.
         Animated.sequence([
           Animated.spring(shape, { toValue: 1, useNativeDriver: false, speed: 15, bounciness: 10 }),
           Animated.timing(content, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
-        ]).start();
+        ]).start(() => {
+          options?.onDelivered?.();
+        });
 
         const hideTimer = setTimeout(() => {
           Animated.sequence([

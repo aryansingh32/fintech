@@ -48,6 +48,20 @@ export function LoanDetailScreen() {
           <GridItem label="Maturity Date" value={formatDate(loan.maturityDate)} />
         </View>
 
+        {loan.product ? (
+          <View style={{ marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+            <Text style={styles.caption}>Product Financed</Text>
+            <Text style={{ ...typography.bodyStrong, color: colors.textPrimary, marginTop: 4 }}>
+              {loan.product.brand} {loan.product.model}
+            </Text>
+            {loan.productIdentifier?.imei1 || loan.productIdentifier?.serialNumber ? (
+              <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: 2 }}>
+                Device ID: {loan.productIdentifier.imei1 || loan.productIdentifier.serialNumber}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         <View style={styles.outstandingBlock}>
           <Text style={styles.caption}>Current Outstanding</Text>
           <Text style={styles.bigAmount}>{formatMoney(summary.outstanding)}</Text>

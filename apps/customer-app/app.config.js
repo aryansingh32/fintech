@@ -15,7 +15,7 @@ module.exports = {
     assetBundlePatterns: ['**/*'],
     android: {
       package: 'com.sptcfinance.customer',
-      versionCode: 2,
+      versionCode: 4,
       googleServicesFile: './android/app/google-services.json',
       permissions: [
         'USE_BIOMETRIC',
@@ -29,7 +29,7 @@ module.exports = {
       },
     },
     extra: {
-      apiBaseUrl: process.env.API_BASE_URL ?? 'http://10.0.2.2:3000',
+      apiBaseUrl: process.env.API_BASE_URL ?? 'https://sptcfinance.duckdns.org',
       // Firebase project "sptc-finance-platform" - shared Web OAuth client used by
       // @react-native-google-signin/google-signin to obtain a Google ID token.
       googleWebClientId:

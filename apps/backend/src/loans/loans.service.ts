@@ -80,7 +80,12 @@ export class LoansService {
 
     const customer = await this.customers.findById(dto.customerId, staff);
     if (!staff.branchId && !staff.isGlobal) throw new ForbiddenException('Staff must belong to a branch.');
-    const branchId = staff.isGlobal ? customer.branchId ?? staff.branchId! : staff.branchId!;
+    let branchId = staff.isGlobal ? customer.branchId ?? staff.branchId : staff.branchId;
+    if (!branchId) {
+      const fallbackBranch = await this.prisma.branch.findFirst();
+      if (!fallbackBranch) throw new BadRequestException('No branches found in the system to assign this loan to.');
+      branchId = fallbackBranch.id;
+    }
 
     let productIdentifier = null;
     if (dto.productIdentifierId) {
@@ -208,7 +213,7 @@ export class LoansService {
   async findByIdForCustomer(loanId: string, customerId: string) {
     const loan = await this.prisma.loan.findUnique({
       where: { id: loanId },
-      include: { installments: { orderBy: { sequence: 'asc' } }, productIdentifier: true, agreement: true },
+      include: { installments: { orderBy: { sequence: 'asc' } }, product: true, productIdentifier: true, agreement: true },
     });
     if (!loan) throw new NotFoundException('Loan not found.');
     if (loan.customerId !== customerId) throw new ForbiddenException('You do not have access to this loan.');
@@ -271,6 +276,7 @@ export class LoansService {
         const agreement = await tx.agreement.create({
           data: {
             loanId,
+            acceptedByCustomerAt: new Date(),
             termsSnapshot: {
               loanNumber: loan.loanNumber,
               cashPrice: loan.cashPrice.toString(),

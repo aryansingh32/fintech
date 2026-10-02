@@ -117,11 +117,13 @@ export class CustomersService {
       if (loan.status === 'COMPLETED') badge.hasCompletedLoan = true;
 
       let outstanding = new Decimal(badge.outstanding);
-      for (const installment of loan.installments) {
-        if (installment.status === 'CANCELLED') continue;
-        const remaining = new Decimal(installment.totalAmount).minus(installment.paidAmount);
-        if (remaining.gt(0)) outstanding = outstanding.plus(remaining);
-        if (installment.status === 'OVERDUE') badge.hasOverdueLoan = true;
+      if (['ACTIVE', 'DEFAULTED'].includes(loan.status)) {
+        for (const installment of loan.installments) {
+          if (installment.status === 'CANCELLED') continue;
+          const remaining = new Decimal(installment.totalAmount).minus(installment.paidAmount);
+          if (remaining.gt(0)) outstanding = outstanding.plus(remaining);
+          if (installment.status === 'OVERDUE') badge.hasOverdueLoan = true;
+        }
       }
       badge.outstanding = outstanding.toFixed(2);
     }
@@ -233,7 +235,7 @@ export class CustomersService {
         _sum: { amount: true },
       }),
       this.prisma.installment.findMany({
-        where: { loan: { customerId }, status: { notIn: ['CANCELLED'] } },
+        where: { loan: { customerId, status: { in: ['ACTIVE', 'DEFAULTED'] } }, status: { notIn: ['CANCELLED'] } },
         select: { id: true, loanId: true, dueDate: true, totalAmount: true, paidAmount: true, status: true },
         orderBy: { dueDate: 'asc' },
       }),
