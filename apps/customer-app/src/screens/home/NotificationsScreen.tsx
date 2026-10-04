@@ -31,11 +31,11 @@ export function NotificationsScreen() {
           <View style={styles.row}>
             <View style={styles.titleRow}>
               {!item.readAt ? <View style={styles.unreadDot} /> : null}
-              <Text style={styles.title}>{eventLabel(item.event)}</Text>
+              <Text style={styles.title}>{item.deliveryMetadata?.title || eventLabel(item.event)}</Text>
             </View>
             <Text style={styles.caption}>{formatDate(item.createdAt)}</Text>
           </View>
-          {typeof item.payload?.title === 'string' ? <Text style={styles.body}>{item.payload.title as string}</Text> : null}
+          {item.deliveryMetadata?.body ? <Text style={styles.body}>{item.deliveryMetadata.body}</Text> : null}
         </Card>
       )}
     />

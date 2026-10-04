@@ -23,6 +23,7 @@ export enum Permission {
   CUSTOMER_EDIT = 'customer.edit',
   CUSTOMER_DELETE = 'customer.delete',
   CUSTOMER_NOTE_ADD = 'customer.note_add',
+  CUSTOMER_MESSAGE_SEND = 'customer.message_send',
 
   KYC_CAPTURE = 'kyc.capture',
   KYC_VERIFY = 'kyc.verify',

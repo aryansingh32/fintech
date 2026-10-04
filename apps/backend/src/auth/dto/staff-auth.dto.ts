@@ -15,17 +15,3 @@ export class StaffLoginDto {
   @Type(() => DeviceInfoDto)
   device: DeviceInfoDto;
 }
-
-export class VerifyStaffDeviceOtpDto {
-  @IsString()
-  @Length(10, 15)
-  mobile: string;
-
-  @IsString()
-  @Length(6, 6)
-  otp: string;
-
-  @ValidateNested()
-  @Type(() => DeviceInfoDto)
-  device: DeviceInfoDto;
-}

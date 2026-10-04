@@ -7,7 +7,9 @@ import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { assertBranchAccess, branchWhereClause } from '../rbac/branch-scope.util';
 import { generateCustomerCode, retryOnConflict } from '../common/id-generators';
-import { CreateCustomerDto, DeleteCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEvent } from '../notifications/notification-events';
+import { CreateCustomerDto, DeleteCustomerDto, SendCustomerMessageDto, UpdateCustomerDto } from './dto/customer.dto';
 
 const BLOCKING_LOAN_STATUSES = ['PENDING_APPROVAL', 'APPROVED', 'ACTIVE', 'DEFAULTED'];
 
@@ -16,6 +18,7 @@ export class CustomersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async create(dto: CreateCustomerDto, staff: AuthUser) {
@@ -298,6 +301,28 @@ export class CustomersService {
       entityId: customer.id,
     });
     return created;
+  }
+
+  /** Staff-composed free-text message to one customer - delivered as an in-app notification plus a push notification, same as every other event-driven notification. */
+  async sendMessage(customerId: string, dto: SendCustomerMessageDto, staff: AuthUser) {
+    const customer = await this.findById(customerId, staff);
+    const title = dto.title?.trim() || 'Message from SPTC Finance';
+    const ids = await this.notifications.enqueue(this.prisma, {
+      event: NotificationEvent.STAFF_MESSAGE,
+      customerId: customer.id,
+      payload: { title, message: dto.message },
+    });
+    await this.notifications.dispatchAll(ids);
+    await this.audit.record({
+      actorType: AuditActorType.STAFF,
+      actorId: staff.id,
+      role: staff.role,
+      action: 'CUSTOMER_MESSAGE_SENT',
+      entityType: 'Customer',
+      entityId: customer.id,
+      afterState: { title, message: dto.message },
+    });
+    return { success: true };
   }
 
   async getRepaymentProfile(customerId: string) {

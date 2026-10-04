@@ -7,7 +7,13 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { Permission } from '../rbac/permissions';
 import { CustomersService } from './customers.service';
-import { AddCustomerNoteDto, CreateCustomerDto, DeleteCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
+import {
+  AddCustomerNoteDto,
+  CreateCustomerDto,
+  DeleteCustomerDto,
+  SendCustomerMessageDto,
+  UpdateCustomerDto,
+} from './dto/customer.dto';
 
 @UseGuards(JwtAuthGuard)
 @RequireSubject(SubjectType.STAFF)
@@ -61,6 +67,12 @@ export class CustomersController {
   @Post(':id/notes')
   addNote(@Param('id') id: string, @Body() dto: AddCustomerNoteDto, @CurrentUser() user: AuthUser) {
     return this.customers.addNote(id, dto.note, user);
+  }
+
+  @RequirePermissions(Permission.CUSTOMER_MESSAGE_SEND)
+  @Post(':id/message')
+  sendMessage(@Param('id') id: string, @Body() dto: SendCustomerMessageDto, @CurrentUser() user: AuthUser) {
+    return this.customers.sendMessage(id, dto, user);
   }
 }
 

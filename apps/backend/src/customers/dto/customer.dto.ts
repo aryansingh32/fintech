@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Length } from 'class-validator';
+import { IsOptional, IsString, Length, MaxLength } from 'class-validator';
 
 export class CreateCustomerDto {
   @IsString()
@@ -107,6 +107,17 @@ export class DeleteCustomerDto {
 export class AddCustomerNoteDto {
   @IsString()
   note: string;
+}
+
+export class SendCustomerMessageDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  title?: string;
+
+  @IsString()
+  @Length(1, 2000)
+  message: string;
 }
 
 export class SearchCustomerDto {

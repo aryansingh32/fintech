@@ -85,7 +85,11 @@ export function DashboardScreen() {
 
       <View style={styles.grid}>
         <StatTile label="Total Overdue" value={formatMoney(overdueTotal)} accent="danger" />
-        <StatTile label="Active Loans" value={String(activeLoans)} />
+        <StatTile
+          label="Active Loans"
+          value={String(activeLoans)}
+          onPress={() => navigation.navigate('Loans', { initialStatus: LoanStatus.ACTIVE })}
+        />
         <StatTile label="Due Today" value={String(emiDueToday.data?.length ?? 0)} />
       </View>
 

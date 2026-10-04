@@ -383,6 +383,8 @@ export interface AppNotification {
   channel: NotificationChannel;
   status: NotificationStatus;
   payload: Record<string, unknown>;
+  /** Set once the notification is dispatched - the actual rendered {title, body} shown to the user, as opposed to `payload`'s raw template variables. */
+  deliveryMetadata?: { title?: string; body?: string } | null;
   createdAt: IsoDateString;
   sentAt?: IsoDateString | null;
   readAt?: IsoDateString | null;

@@ -10,7 +10,7 @@ import { ApiError } from '@sptc/shared';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'StaffLogin'>;
 
-export function StaffLoginScreen({ navigation }: Props) {
+export function StaffLoginScreen(_props: Props) {
   const { login, loginWithGoogle } = useAuth();
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
@@ -20,11 +20,8 @@ export function StaffLoginScreen({ navigation }: Props) {
   const onSubmit = async () => {
     setLoading(true);
     try {
-      const { devOtp } = await login(mobile.trim(), password);
-      if (devOtp) {
-        navigation.navigate('DeviceVerify', { mobile: mobile.trim(), devOtp });
-      }
-      // If no devOtp/step-up was needed, AuthContext already flipped to 'authenticated' and RootNavigator re-renders.
+      await login(mobile.trim(), password);
+      // AuthContext already flipped to 'authenticated' and RootNavigator re-renders.
     } catch (err) {
       Alert.alert('Login failed', err instanceof ApiError ? err.message : 'Please check your credentials.');
     } finally {

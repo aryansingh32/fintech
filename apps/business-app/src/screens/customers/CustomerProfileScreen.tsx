@@ -15,6 +15,7 @@ import {
   useCustomerSummary,
   useDeleteCustomer,
   useRepaymentProfile,
+  useSendCustomerMessage,
   useSubmitKyc,
   useUploadFile,
   useVerifyKyc,
@@ -56,6 +57,7 @@ export function CustomerProfileScreen() {
 
   const [addingKyc, setAddingKyc] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
 
   const verifyKyc = useVerifyKyc(customerId);
 
@@ -204,6 +206,12 @@ export function CustomerProfileScreen() {
           variant="secondary"
           icon="time-outline"
         />
+        <PrimaryButton
+          label="Send Message"
+          onPress={() => setMessageModalOpen(true)}
+          variant="secondary"
+          icon="chatbubble-outline"
+        />
       </View>
 
       <Text style={styles.sectionTitle}>Loans</Text>
@@ -231,6 +239,10 @@ export function CustomerProfileScreen() {
 
       {deleteModalOpen ? (
         <DeleteCustomerModal customerId={customerId} onClose={() => setDeleteModalOpen(false)} onDeleted={() => navigation.goBack()} />
+      ) : null}
+
+      {messageModalOpen ? (
+        <SendMessageModal customerId={customerId} onClose={() => setMessageModalOpen(false)} />
       ) : null}
     </ScrollView>
   );
@@ -332,6 +344,48 @@ function DeleteCustomerModal({ customerId, onClose, onDeleted }: { customerId: s
           <TextInput value={reason} onChangeText={setReason} style={styles.input} />
           <View style={{ height: spacing.md }} />
           <PrimaryButton label="Confirm Delete" onPress={onConfirm} variant="danger" loading={deleteCustomer.isPending} disabled={!password} />
+          <View style={{ height: spacing.sm }} />
+          <PrimaryButton label="Cancel" onPress={onClose} variant="secondary" />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function SendMessageModal({ customerId, onClose }: { customerId: string; onClose: () => void }) {
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState('');
+  const sendMessage = useSendCustomerMessage(customerId);
+
+  const onSend = async () => {
+    try {
+      await sendMessage.mutateAsync({ title: title.trim() || undefined, message: message.trim() });
+      Alert.alert('Message sent', 'The customer will see this in their notifications.', [{ text: 'OK', onPress: onClose }]);
+    } catch (err) {
+      Alert.alert('Could not send message', err instanceof ApiError ? err.message : 'Please try again.');
+    }
+  };
+
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Send Message</Text>
+          <Text style={styles.caption}>This is delivered to the customer as an in-app and push notification.</Text>
+          <Text style={[styles.label, { marginTop: spacing.md }]}>Title (optional)</Text>
+          <TextInput value={title} onChangeText={setTitle} style={styles.input} placeholder="Message from SPTC Finance" placeholderTextColor={colors.textSecondary} />
+          <Text style={styles.label}>Message</Text>
+          <TextInput
+            value={message}
+            onChangeText={setMessage}
+            multiline
+            numberOfLines={4}
+            style={[styles.input, { minHeight: 100, textAlignVertical: 'top' }]}
+            placeholder="Type your message..."
+            placeholderTextColor={colors.textSecondary}
+          />
+          <View style={{ height: spacing.md }} />
+          <PrimaryButton label="Send" onPress={onSend} loading={sendMessage.isPending} disabled={!message.trim()} />
           <View style={{ height: spacing.sm }} />
           <PrimaryButton label="Cancel" onPress={onClose} variant="secondary" />
         </View>

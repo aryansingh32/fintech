@@ -27,6 +27,7 @@ export enum NotificationEvent {
   PENALTY_REVOKED = 'PENALTY_REVOKED',
   PAYMENT_RECEIVED_STAFF = 'PAYMENT_RECEIVED_STAFF',
   BACKUP_FAILED = 'BACKUP_FAILED',
+  STAFF_MESSAGE = 'STAFF_MESSAGE',
 }
 
 export type SupportedLocale = 'en' | 'hi';
@@ -178,6 +179,13 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationEvent, NotificationTempl
       en: 'Tonight\'s automatic backup did not complete: {{reason}}. Please check the server soon.',
       hi: 'आज रात का स्वचालित बैकअप पूरा नहीं हुआ: {{reason}}। कृपया जल्द ही सर्वर की जांच करें।',
     },
+  },
+  // Free-text message composed by staff for one customer - title/body are
+  // the staff's own words (from the payload), not a fixed template, so both
+  // locale slots simply echo the payload rather than carrying real translations.
+  [NotificationEvent.STAFF_MESSAGE]: {
+    title: { en: '{{title}}', hi: '{{title}}' },
+    body: { en: '{{message}}', hi: '{{message}}' },
   },
 };
 

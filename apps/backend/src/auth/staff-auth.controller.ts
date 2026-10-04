@@ -8,7 +8,7 @@ import { AuthUser } from '../common/interfaces/auth-user.interface';
 import { StaffAuthService } from './staff-auth.service';
 import { SessionService } from './session.service';
 import { RefreshTokenDto } from './dto/customer-auth.dto';
-import { StaffLoginDto, VerifyStaffDeviceOtpDto } from './dto/staff-auth.dto';
+import { StaffLoginDto } from './dto/staff-auth.dto';
 import { GoogleLoginDto } from './dto/google-auth.dto';
 
 @Controller({ path: 'auth/staff', version: '1' })
@@ -22,12 +22,6 @@ export class StaffAuthController {
   @Post('login')
   login(@Body() dto: StaffLoginDto, @Ip() ip: string) {
     return this.staffAuth.login(dto.mobile, dto.password, dto.device, ip);
-  }
-
-  @Public()
-  @Post('device/verify')
-  verifyDevice(@Body() dto: VerifyStaffDeviceOtpDto, @Ip() ip: string) {
-    return this.staffAuth.verifyDeviceOtp(dto.mobile, dto.otp, dto.device, ip);
   }
 
   @Public()

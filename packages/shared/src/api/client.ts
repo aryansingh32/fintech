@@ -250,22 +250,19 @@ export class ApiClient {
   // ---------------------------------------------------------------------
   staffAuth = {
     login: (mobile: string, password: string, device: DeviceInfo) =>
-      this.request<
-        | { status: 'DEVICE_VERIFICATION_REQUIRED'; requestId: string; devOtp?: string }
-        | (IssuedTokens & { status: 'SUCCESS'; staffUserId: string })
-      >('POST', '/auth/staff/login', { mobile, password, device }, { auth: false }),
-    verifyDevice: (mobile: string, otp: string, device: DeviceInfo) =>
       this.request<IssuedTokens & { status: 'SUCCESS'; staffUserId: string }>(
         'POST',
-        '/auth/staff/device/verify',
-        { mobile, otp, device },
+        '/auth/staff/login',
+        { mobile, password, device },
         { auth: false },
       ),
     googleLogin: (idToken: string, device: DeviceInfo) =>
-      this.request<
-        | { status: 'DEVICE_VERIFICATION_REQUIRED'; requestId: string; devOtp?: string }
-        | (IssuedTokens & { status: 'SUCCESS'; staffUserId: string })
-      >('POST', '/auth/staff/google', { idToken, device }, { auth: false }),
+      this.request<IssuedTokens & { status: 'SUCCESS'; staffUserId: string }>(
+        'POST',
+        '/auth/staff/google',
+        { idToken, device },
+        { auth: false },
+      ),
     logout: () => this.request<{ success: true }>('POST', '/auth/staff/logout'),
     logoutOtherDevices: () =>
       this.request<{ success: true; revokedSessions: number }>('POST', '/auth/staff/logout-other-devices'),
@@ -313,6 +310,8 @@ export class ApiClient {
     repaymentProfile: (id: string) => this.request<RepaymentProfile>('GET', `/customers/${id}/repayment-profile`),
     summary: (id: string) => this.request<CustomerSummary>('GET', `/customers/${id}/summary`),
     addNote: (id: string, note: string) => this.request<{ id: string }>('POST', `/customers/${id}/notes`, { note }),
+    sendMessage: (id: string, dto: { title?: string; message: string }) =>
+      this.request<{ success: true }>('POST', `/customers/${id}/message`, dto),
   };
 
   // ---------------------------------------------------------------------

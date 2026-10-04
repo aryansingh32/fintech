@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -25,8 +25,15 @@ const FILTERS: { label: string; value?: LoanStatus }[] = [
 
 export function LoansTabScreen() {
   const navigation = useNavigation<Nav>();
-  const [filter, setFilter] = useState<LoanStatus | undefined>(undefined);
+  const route = useRoute<RouteProp<MainTabParamList, 'Loans'>>();
+  const [filter, setFilter] = useState<LoanStatus | undefined>(route.params?.initialStatus);
   const { data: loans, isLoading } = useLoans({ status: filter });
+
+  // Arriving here from a shortcut (e.g. Dashboard's "Active Loans" tile) should
+  // re-apply that filter even if this tab was already mounted with a different one.
+  useEffect(() => {
+    if (route.params?.initialStatus) setFilter(route.params.initialStatus);
+  }, [route.params?.initialStatus]);
 
   return (
     <View style={styles.screen}>

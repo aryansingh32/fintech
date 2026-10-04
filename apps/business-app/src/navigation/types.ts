@@ -1,12 +1,13 @@
+import { LoanStatus } from '@sptc/shared';
+
 export type AuthStackParamList = {
   StaffLogin: undefined;
-  DeviceVerify: { mobile: string; devOtp?: string };
 };
 
 export type MainTabParamList = {
   Dashboard: undefined;
   Customers: undefined;
-  Loans: undefined;
+  Loans: { initialStatus?: LoanStatus } | undefined;
   Collections: undefined;
   More: undefined;
 };

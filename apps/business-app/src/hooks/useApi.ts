@@ -84,6 +84,12 @@ export function useDeleteCustomer(customerId: string) {
   });
 }
 
+export function useSendCustomerMessage(customerId: string) {
+  return useMutation({
+    mutationFn: (dto: { title?: string; message: string }) => apiClient.customers.sendMessage(customerId, dto),
+  });
+}
+
 export function useCustomerKyc(customerId: string) {
   return useQuery({
     queryKey: ['kyc', customerId],

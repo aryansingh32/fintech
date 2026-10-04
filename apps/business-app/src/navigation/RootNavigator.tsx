@@ -51,7 +51,7 @@ export function RootNavigator() {
     >
       {status === 'loading' ? (
         <LoadingState label="Starting SPTC Finance Business..." />
-      ) : status === 'unauthenticated' || status === 'device_verification_required' ? (
+      ) : status === 'unauthenticated' ? (
         <AuthNavigator />
       ) : (
         <Stack.Navigator

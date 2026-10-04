@@ -1,22 +1,18 @@
 import { ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { AuditActorType, OtpPurpose, SubjectType } from '@prisma/client';
+import { AuditActorType, SubjectType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { OtpService } from './otp.service';
 import { SessionService, IssuedTokens } from './session.service';
 import { DeviceInfoDto } from './dto/device-info.dto';
 import { GoogleTokenService } from './google-token.service';
 
-export type StaffLoginResult =
-  | { status: 'DEVICE_VERIFICATION_REQUIRED'; requestId: string; devOtp?: string }
-  | (IssuedTokens & { status: 'SUCCESS'; staffUserId: string });
+export type StaffLoginResult = IssuedTokens & { status: 'SUCCESS'; staffUserId: string };
 
 @Injectable()
 export class StaffAuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly otp: OtpService,
     private readonly sessions: SessionService,
     private readonly audit: AuditService,
     private readonly googleTokens: GoogleTokenService,
@@ -49,11 +45,7 @@ export class StaffAuthService {
     return this.completeLogin(staff.id, device, ipAddress);
   }
 
-  /**
-   * Password login. A staff member on a device that has never verified with
-   * OTP is asked to step up before a session is issued (protects against a
-   * leaked password alone being sufficient on an unknown device).
-   */
+  /** Password login - a valid mobile + password issues a session directly, same as Google Sign-In. */
   async login(mobile: string, password: string, device: DeviceInfoDto, ipAddress?: string): Promise<StaffLoginResult> {
     const staff = await this.prisma.staffUser.findUnique({ where: { mobile } });
     if (!staff || !staff.isActive) throw new UnauthorizedException('Invalid credentials.');
@@ -64,38 +56,6 @@ export class StaffAuthService {
     if (!staff.isApproved) {
       throw new ForbiddenException('Your account is pending approval by the super admin.');
     }
-
-    const knownDevice = await this.prisma.device.findFirst({
-      where: {
-        subjectType: SubjectType.STAFF,
-        staffUserId: staff.id,
-        deviceIdentifier: device.deviceIdentifier,
-        isTrusted: true,
-      },
-    });
-
-    if (!knownDevice) {
-      const result = await this.otp.requestOtp(mobile, OtpPurpose.STAFF_STEP_UP, {
-        ipAddress,
-        deviceId: device.deviceIdentifier,
-      });
-      return { status: 'DEVICE_VERIFICATION_REQUIRED', requestId: result.requestId, devOtp: result.devOtp };
-    }
-
-    return this.completeLogin(staff.id, device, ipAddress);
-  }
-
-  async verifyDeviceOtp(
-    mobile: string,
-    otp: string,
-    device: DeviceInfoDto,
-    ipAddress?: string,
-  ): Promise<StaffLoginResult> {
-    const staff = await this.prisma.staffUser.findUnique({ where: { mobile } });
-    if (!staff || !staff.isActive) throw new UnauthorizedException('Invalid credentials.');
-
-    const isValid = await this.otp.verifyOtp(mobile, OtpPurpose.STAFF_STEP_UP, otp);
-    if (!isValid) throw new UnauthorizedException('Incorrect or expired verification code.');
 
     return this.completeLogin(staff.id, device, ipAddress);
   }
